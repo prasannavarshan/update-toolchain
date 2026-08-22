@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.3.0
+
+### Added
+- `--json`: a machine-readable report on stdout with all progress moved to
+  stderr, so `--json > report.json` yields a file containing only JSON. Counts
+  and findings are suitable for a dashboard or an alert.
+- An end-of-run summary with real counts, a verdict, and every unresolved
+  warning and error gathered in one place.
+- `[n/16]` phase markers. No animation and no carriage returns, so a redirected
+  run still reads back as a clean list.
+- `--color=auto|always|never`, honouring [`NO_COLOR`](https://no-color.org).
+
+### Fixed
+- **The world-writable PATH check was wrong twice over** and fired on correctly
+  configured machines. It matched any two `w` characters anywhere, which flags
+  every group-writable directory — Homebrew's own normal layout — and its
+  positional test was off by one, reading other-*read* instead of other-write.
+  A security check that fires on a healthy system teaches people to ignore it.
+  Now an extracted, tested predicate.
+- Output was coloured unconditionally, so any pipe or CI log collected escape
+  codes. Colour is now off unless stdout is a terminal. Every status also
+  carries a text label, so nothing is conveyed by colour alone.
+- `--audit` exited before reaching the end of the script, so neither the summary
+  nor the JSON report ran in one of the two read-only modes. All terminal paths
+  now route through one function, `die` included.
+- Finding counts were inflated by continuation lines: one untrusted tap was
+  reported as three errors, one `brew doctor` warning as ten. Remediation text
+  and captured output are now `[DETAIL]` — shown and logged, never tallied.
+
 ## v0.2.0
 
 ### Changed
