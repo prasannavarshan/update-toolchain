@@ -387,7 +387,7 @@ sec "Running brew doctor…"
 DOCTOR_OUT=$(brew doctor 2>&1 || true)
 if echo "$DOCTOR_OUT" | grep -q "Warning:"; then
   warn "brew doctor found warnings — review:"
-  echo "$DOCTOR_OUT" | grep -A2 "Warning:" | while IFS= read -r line; do
+  echo "$DOCTOR_OUT" | { grep -A2 "Warning:" || true; } | while IFS= read -r line; do
     [[ -z "$line" || "$line" == "--" ]] && continue
     detail "$line"
   done
@@ -775,7 +775,7 @@ fi
 # Homebrew download cache — already handled by brew_cleanup_safe above (prune=7)
 # but run again with --prune=all for a full clean
 if $DRY; then echo "  (dry-run) brew cleanup --prune=all"
-else brew cleanup --prune=all 2>/dev/null | grep "freed" | while IFS= read -r l; do ok "$l"; done || true; fi
+else brew cleanup --prune=all 2>/dev/null | { grep "freed" || true; } | while IFS= read -r l; do ok "$l"; done || true; fi
 
 log "Cache cleanup complete"
 
@@ -1279,7 +1279,7 @@ if require cargo "see: rustup.rs"; then
 
   # Also list cargo-installed binaries for audit trail
   log "  Cargo-installed binaries:"
-  cargo install --list 2>/dev/null | grep -E "^[a-z]" | while IFS= read -r line; do
+  cargo install --list 2>/dev/null | { grep -E "^[a-z]" || true; } | while IFS= read -r line; do
     log "    $line"
   done
 fi
