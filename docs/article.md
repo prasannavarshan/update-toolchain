@@ -322,6 +322,16 @@ done
 
 6. **SLSA is a consumer spec too.** Most people think SLSA is for producers/builders. It's equally a spec for how consumers should verify artifacts.
 
+7. **A check that fires on a healthy machine is worse than no check.** My world-writable `PATH` test matched any two `w` characters in the permission string — so it flagged every *group*-writable directory, which is Homebrew's own normal layout. It also read the wrong column, testing other-*read* instead of other-write. Result: `PATH hijack risk!` on a correctly configured Mac, every single run — a warning with no way to act on it, which is the kind you stop reading. A false positive doesn't just waste attention; it trains you to skip the output, and then the true positive scrolls past too. Prefer a false negative you'll notice missing over a false alarm you'll learn to filter.
+
+8. **My tool was broken for every user but me, and only a second machine could tell me.** One line read the list of Rust-installed binaries:
+
+   ```bash
+   cargo install --list | grep -E "^[a-z]" | while read -r line; do
+   ```
+
+   Under `set -euo pipefail`, `grep` matching nothing exits 1, which aborts the entire script. On a machine with no cargo-installed binaries — a fresh Mac, most people's Mac — the dry run died silently a third of the way through. It worked flawlessly for me because I happen to have some. No amount of testing on my own laptop could have surfaced it; a CI runner found it on its first execution. If you're writing a tool that inspects an environment, the one environment you cannot test in is your own.
+
 ---
 
 ## References
