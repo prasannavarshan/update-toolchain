@@ -1,7 +1,7 @@
 {
   "type": "excalidraw",
   "version": 2,
-  "source": "https://excalidraw.com",
+  "source": "https://marketplace.visualstudio.com/items?itemName=pomdtr.excalidraw-editor",
   "elements": [
     {
       "type": "text",
@@ -25,15 +25,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10001,
-      "version": 1,
-      "versionNonce": 10002,
+      "version": 2,
+      "versionNonce": 842229799,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": null,
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "a0",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "text",
@@ -57,15 +62,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10003,
-      "version": 1,
-      "versionNonce": 10004,
+      "version": 2,
+      "versionNonce": 1261687241,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": null,
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "a1",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "text",
@@ -89,15 +99,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10005,
-      "version": 1,
-      "versionNonce": 10006,
+      "version": 2,
+      "versionNonce": 268553031,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": null,
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "a2",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -115,8 +130,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10010,
-      "version": 1,
-      "versionNonce": 10011,
+      "version": 2,
+      "versionNonce": 1112060073,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -133,7 +148,10 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "a3",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
@@ -157,15 +175,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10012,
-      "version": 1,
-      "versionNonce": 10013,
+      "version": 2,
+      "versionNonce": 1750518375,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "brew_input",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "a4",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -183,8 +206,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10020,
-      "version": 1,
-      "versionNonce": 10021,
+      "version": 2,
+      "versionNonce": 85898121,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -201,7 +224,10 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "a5",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
@@ -225,15 +251,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10022,
-      "version": 1,
-      "versionNonce": 10023,
+      "version": 2,
+      "versionNonce": 1744758151,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "npm_input",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "a6",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -251,8 +282,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10030,
-      "version": 1,
-      "versionNonce": 10031,
+      "version": 2,
+      "versionNonce": 1206999657,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -269,7 +300,10 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "a7",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
@@ -293,15 +327,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10032,
-      "version": 1,
-      "versionNonce": 10033,
+      "version": 2,
+      "versionNonce": 1849072807,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "rust_input",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "a8",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -319,8 +358,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10040,
-      "version": 1,
-      "versionNonce": 10041,
+      "version": 2,
+      "versionNonce": 730604873,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -337,7 +376,10 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "a9",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
@@ -361,15 +403,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10042,
-      "version": 1,
-      "versionNonce": 10043,
+      "version": 2,
+      "versionNonce": 1051357127,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "go_input",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aA",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -387,8 +434,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10050,
-      "version": 1,
-      "versionNonce": 10051,
+      "version": 2,
+      "versionNonce": 726307881,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -405,7 +452,10 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "aB",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
@@ -429,15 +479,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10052,
-      "version": 1,
-      "versionNonce": 10053,
+      "version": 2,
+      "versionNonce": 1937170151,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "pip_input",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aC",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "arrow",
@@ -455,11 +510,11 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10060,
-      "version": 1,
-      "versionNonce": 10061,
+      "version": 2,
+      "versionNonce": 1259874057,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "points": [
@@ -483,7 +538,12 @@
         "gap": 2
       },
       "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "endArrowhead": "arrow",
+      "lastCommittedPoint": null,
+      "index": "aD",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723
     },
     {
       "type": "arrow",
@@ -501,11 +561,11 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10062,
-      "version": 1,
-      "versionNonce": 10063,
+      "version": 2,
+      "versionNonce": 791177735,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "points": [
@@ -529,7 +589,12 @@
         "gap": 2
       },
       "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "endArrowhead": "arrow",
+      "lastCommittedPoint": null,
+      "index": "aE",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723
     },
     {
       "type": "arrow",
@@ -547,11 +612,11 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10064,
-      "version": 1,
-      "versionNonce": 10065,
+      "version": 2,
+      "versionNonce": 91250153,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "points": [
@@ -575,7 +640,12 @@
         "gap": 2
       },
       "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "endArrowhead": "arrow",
+      "lastCommittedPoint": null,
+      "index": "aF",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723
     },
     {
       "type": "arrow",
@@ -593,11 +663,11 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10066,
-      "version": 1,
-      "versionNonce": 10067,
+      "version": 2,
+      "versionNonce": 247173415,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "points": [
@@ -621,7 +691,12 @@
         "gap": 2
       },
       "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "endArrowhead": "arrow",
+      "lastCommittedPoint": null,
+      "index": "aG",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723
     },
     {
       "type": "arrow",
@@ -639,11 +714,11 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10068,
-      "version": 1,
-      "versionNonce": 10069,
+      "version": 2,
+      "versionNonce": 2036250825,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "points": [
@@ -667,7 +742,12 @@
         "gap": 2
       },
       "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "endArrowhead": "arrow",
+      "lastCommittedPoint": null,
+      "index": "aH",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723
     },
     {
       "type": "rectangle",
@@ -685,8 +765,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10100,
-      "version": 1,
-      "versionNonce": 10101,
+      "version": 2,
+      "versionNonce": 1537004615,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -719,7 +799,10 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "aI",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
@@ -743,15 +826,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10102,
-      "version": 1,
-      "versionNonce": 10103,
+      "version": 2,
+      "versionNonce": 1484699561,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": null,
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aJ",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -769,8 +857,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10110,
-      "version": 1,
-      "versionNonce": 10111,
+      "version": 2,
+      "versionNonce": 2108207975,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -783,7 +871,10 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "aK",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
@@ -807,15 +898,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10112,
-      "version": 1,
-      "versionNonce": 10113,
+      "version": 2,
+      "versionNonce": 352049801,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "l1",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aL",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -833,8 +929,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10120,
-      "version": 1,
-      "versionNonce": 10121,
+      "version": 2,
+      "versionNonce": 757837447,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -847,15 +943,18 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "aM",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
       "id": "l2_t",
-      "x": 95,
-      "y": 323,
-      "width": 770,
-      "height": 20,
+      "x": 152.4609375,
+      "y": 324.875,
+      "width": 655.078125,
+      "height": 16.25,
       "text": "L2  SHA256 bottle checksums │ Sigstore cosign │ Signed manifests │ ECDSA registry sigs",
       "originalText": "L2  SHA256 bottle checksums │ Sigstore cosign │ Signed manifests │ ECDSA registry sigs",
       "fontSize": 13,
@@ -871,15 +970,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10122,
-      "version": 1,
-      "versionNonce": 10123,
+      "version": 4,
+      "versionNonce": 1077559431,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "l2",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aN",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414488983,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -897,8 +1001,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10130,
-      "version": 1,
-      "versionNonce": 10131,
+      "version": 2,
+      "versionNonce": 1692550567,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -911,15 +1015,18 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "aO",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
       "id": "l3_t",
-      "x": 95,
-      "y": 368,
-      "width": 770,
-      "height": 20,
+      "x": 102.94921875,
+      "y": 369.875,
+      "width": 754.1015625,
+      "height": 16.25,
       "text": "L3  Tap allowlist (BLOCK untrusted) │ Pinned package list │ --ignore-scripts (kill postinstall RCE)",
       "originalText": "L3  Tap allowlist (BLOCK untrusted) │ Pinned package list │ --ignore-scripts (kill postinstall RCE)",
       "fontSize": 13,
@@ -935,15 +1042,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10132,
-      "version": 1,
-      "versionNonce": 10133,
+      "version": 4,
+      "versionNonce": 1472732169,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "l3",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aP",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414489966,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -961,8 +1073,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10140,
-      "version": 1,
-      "versionNonce": 10141,
+      "version": 2,
+      "versionNonce": 335083719,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -975,15 +1087,18 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "aQ",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
       "id": "l4_t",
-      "x": 95,
-      "y": 413,
-      "width": 770,
-      "height": 20,
+      "x": 201.97265625,
+      "y": 414.875,
+      "width": 556.0546875,
+      "height": 16.25,
       "text": "L4  SIP enabled │ Gatekeeper enabled │ No world-writable PATH directories",
       "originalText": "L4  SIP enabled │ Gatekeeper enabled │ No world-writable PATH directories",
       "fontSize": 13,
@@ -999,15 +1114,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10142,
-      "version": 1,
-      "versionNonce": 10143,
+      "version": 4,
+      "versionNonce": 1938378633,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "l4",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aR",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414491885,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -1025,8 +1145,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10150,
-      "version": 1,
-      "versionNonce": 10151,
+      "version": 2,
+      "versionNonce": 269240295,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -1039,15 +1159,18 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "aS",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
       "id": "l5_t",
-      "x": 95,
-      "y": 458,
-      "width": 770,
-      "height": 20,
+      "x": 160.078125,
+      "y": 459.875,
+      "width": 639.84375,
+      "height": 16.25,
       "text": "L5  SHA256 pre/post recording │ Timestamped execution log │ Binary diff between runs",
       "originalText": "L5  SHA256 pre/post recording │ Timestamped execution log │ Binary diff between runs",
       "fontSize": 13,
@@ -1063,15 +1186,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10152,
-      "version": 1,
-      "versionNonce": 10153,
+      "version": 4,
+      "versionNonce": 1232503527,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "l5",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aT",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414492685,
+      "autoResize": true
     },
     {
       "type": "arrow",
@@ -1089,11 +1217,11 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10160,
-      "version": 1,
-      "versionNonce": 10161,
+      "version": 2,
+      "versionNonce": 1193849607,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "points": [
@@ -1117,7 +1245,12 @@
         "gap": 2
       },
       "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "endArrowhead": "arrow",
+      "lastCommittedPoint": null,
+      "index": "aU",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
@@ -1141,15 +1274,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10162,
-      "version": 1,
-      "versionNonce": 10163,
+      "version": 2,
+      "versionNonce": 590685417,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": null,
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aV",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -1167,8 +1305,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10200,
-      "version": 1,
-      "versionNonce": 10201,
+      "version": 2,
+      "versionNonce": 835369511,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -1185,7 +1323,10 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "aW",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
@@ -1209,15 +1350,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10202,
-      "version": 1,
-      "versionNonce": 10203,
+      "version": 2,
+      "versionNonce": 821206985,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": null,
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aX",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -1235,8 +1381,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10210,
-      "version": 1,
-      "versionNonce": 10211,
+      "version": 2,
+      "versionNonce": 81714503,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -1249,15 +1395,18 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "aY",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
       "id": "prov_card_t",
-      "x": 95,
-      "y": 618,
-      "width": 220,
-      "height": 85,
+      "x": 121.2109375,
+      "y": 619.375,
+      "width": 167.578125,
+      "height": 81.25,
       "text": "PROVENANCE\n─────────────\nbrew verify (Sigstore)\nnpm audit signatures\ngh attestation verify",
       "originalText": "PROVENANCE\n─────────────\nbrew verify (Sigstore)\nnpm audit signatures\ngh attestation verify",
       "fontSize": 13,
@@ -1273,15 +1422,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10212,
-      "version": 1,
-      "versionNonce": 10213,
+      "version": 5,
+      "versionNonce": 451203719,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "prov_card",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aZ",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414494312,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -1299,8 +1453,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10220,
-      "version": 1,
-      "versionNonce": 10221,
+      "version": 2,
+      "versionNonce": 599891047,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -1313,15 +1467,18 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "aa",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
       "id": "vuln_card_t",
-      "x": 365,
-      "y": 618,
-      "width": 220,
-      "height": 85,
+      "x": 395.01953125,
+      "y": 619.375,
+      "width": 159.9609375,
+      "height": 81.25,
       "text": "BINARY VULN SCAN\n─────────────────\nsyft → grype (SBOM)\ngovulncheck (Go bins)\ncargo audit (Rust)",
       "originalText": "BINARY VULN SCAN\n─────────────────\nsyft → grype (SBOM)\ngovulncheck (Go bins)\ncargo audit (Rust)",
       "fontSize": 13,
@@ -1337,20 +1494,25 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10222,
-      "version": 1,
-      "versionNonce": 10223,
+      "version": 5,
+      "versionNonce": 1067598057,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "vuln_card",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "ab",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414495085,
+      "autoResize": true
     },
     {
       "type": "rectangle",
       "id": "integ_card",
-      "x": 625,
+      "x": 625.28515625,
       "y": 600,
       "width": 240,
       "height": 120,
@@ -1363,8 +1525,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10230,
-      "version": 1,
-      "versionNonce": 10231,
+      "version": 3,
+      "versionNonce": 601086633,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -1377,15 +1539,18 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "ac",
+      "frameId": null,
+      "updated": 1787414495498
     },
     {
       "type": "text",
       "id": "integ_card_t",
-      "x": 635,
-      "y": 618,
-      "width": 220,
-      "height": 85,
+      "x": 665.199951171875,
+      "y": 619.375,
+      "width": 160.17041015625,
+      "height": 81.25,
       "text": "INTEGRITY MONITOR\n─────────────────\ncodesign -v (macOS)\nSHA diff alerting\n⚠ Unexplained → ALERT",
       "originalText": "INTEGRITY MONITOR\n─────────────────\ncodesign -v (macOS)\nSHA diff alerting\n⚠ Unexplained → ALERT",
       "fontSize": 13,
@@ -1401,15 +1566,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10232,
-      "version": 1,
-      "versionNonce": 10233,
+      "version": 6,
+      "versionNonce": 1047073033,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "integ_card",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "ad",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414495766,
+      "autoResize": true
     },
     {
       "type": "rectangle",
@@ -1427,8 +1597,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10240,
-      "version": 1,
-      "versionNonce": 10241,
+      "version": 2,
+      "versionNonce": 647294631,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -1441,15 +1611,18 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "ae",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
       "id": "evidence_t",
-      "x": 105,
-      "y": 752,
-      "width": 740,
-      "height": 75,
+      "x": 90,
+      "y": 760,
+      "width": 576.5625,
+      "height": 60,
       "text": "$ update-toolchain --audit\n[sec] ✓ provenance verified: trivy, semgrep, gitleaks, gh, node, python, go  (9/9)\n[ok]  grype: no high/critical fixable vulns in toolchain binaries\n[sec] Binary diff: 1 change (go), all explained by logged updates",
       "originalText": "$ update-toolchain --audit\n[sec] ✓ provenance verified: trivy, semgrep, gitleaks, gh, node, python, go  (9/9)\n[ok]  grype: no high/critical fixable vulns in toolchain binaries\n[sec] Binary diff: 1 change (go), all explained by logged updates",
       "fontSize": 12,
@@ -1465,15 +1638,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10242,
-      "version": 1,
-      "versionNonce": 10243,
+      "version": 6,
+      "versionNonce": 1705309769,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "evidence",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "af",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414497017,
+      "autoResize": true
     },
     {
       "type": "arrow",
@@ -1491,11 +1669,11 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10250,
-      "version": 1,
-      "versionNonce": 10251,
+      "version": 2,
+      "versionNonce": 997097927,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "points": [
@@ -1519,7 +1697,12 @@
         "gap": 2
       },
       "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "endArrowhead": "arrow",
+      "lastCommittedPoint": null,
+      "index": "ag",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723
     },
     {
       "type": "rectangle",
@@ -1537,8 +1720,8 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10260,
-      "version": 1,
-      "versionNonce": 10261,
+      "version": 2,
+      "versionNonce": 1510515241,
       "isDeleted": false,
       "groupIds": [],
       "boundElements": [
@@ -1555,7 +1738,10 @@
       "locked": false,
       "roundness": {
         "type": 3
-      }
+      },
+      "index": "ah",
+      "frameId": null,
+      "updated": 1787414484723
     },
     {
       "type": "text",
@@ -1579,15 +1765,20 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10262,
-      "version": 1,
-      "versionNonce": 10263,
+      "version": 2,
+      "versionNonce": 568897767,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": "output_box",
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "ai",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     },
     {
       "type": "text",
@@ -1611,20 +1802,27 @@
       "opacity": 100,
       "angle": 0,
       "seed": 10270,
-      "version": 1,
-      "versionNonce": 10271,
+      "version": 2,
+      "versionNonce": 1390703881,
       "isDeleted": false,
       "groupIds": [],
-      "boundElements": null,
+      "boundElements": [],
       "link": null,
       "locked": false,
       "containerId": null,
-      "lineHeight": 1.25
+      "lineHeight": 1.25,
+      "index": "aj",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1787414484723,
+      "autoResize": true
     }
   ],
   "appState": {
-    "viewBackgroundColor": "#ffffff",
-    "gridSize": 20
+    "gridSize": 20,
+    "gridStep": 5,
+    "gridModeEnabled": false,
+    "viewBackgroundColor": "#ffffff"
   },
   "files": {}
 }
