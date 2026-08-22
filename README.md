@@ -29,15 +29,21 @@ that should stay your decision.
 ## Install
 
 ```bash
-brew tap prasannavarshan/tap
-brew trust prasannavarshan/tap      # Homebrew gates third-party taps
-brew install update-toolchain
+brew tap prasannavarshan/tap && brew trust prasannavarshan/tap && brew install update-toolchain
 ```
 
-Recent Homebrew refuses to load a formula from an untrusted third-party tap, so
-the `brew trust` step is required, not optional. Read the formula first if you
-would rather not take that on faith — it installs one bash script and a
-directory of example config.
+The `brew trust` step is required, not optional: current Homebrew refuses to
+load a formula from an untrusted third-party tap, and only official Homebrew
+repositories are trusted by default. A tap cannot waive that from its own
+side — trust is granted on the installing machine, which is rather the point.
+
+Read the formula before you grant it if you would prefer not to take it on
+faith; it installs one bash script and a directory of example config. To trust
+just this formula rather than the whole tap:
+
+```bash
+brew trust --formula prasannavarshan/tap/update-toolchain
+```
 
 Or run it straight from a clone — there is no build step:
 
