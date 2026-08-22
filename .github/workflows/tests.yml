@@ -32,10 +32,19 @@ jobs:
 
       # --dry and --audit must never prompt for sudo or mutate anything. A CI
       # runner is the honest test of that: there is no TTY and no password.
+      # Output is kept, not discarded: when this fails the reason has to be
+      # visible in the log, and a runner is the only place some of these paths
+      # get exercised.
       - name: Read-only modes must run non-interactively
         run: |
-          ./bin/update-toolchain --dry   > /dev/null
-          ./bin/update-toolchain --audit > /dev/null
+          echo "::group::--dry"
+          ./bin/update-toolchain --dry   && dry=0 || dry=$?
+          echo "::endgroup::"
+          echo "::group::--audit"
+          ./bin/update-toolchain --audit && aud=0 || aud=$?
+          echo "::endgroup::"
+          echo "exit codes: dry=$dry audit=$aud"
+          test "$dry" -eq 0 -a "$aud" -eq 0
 
       - name: Piped output must contain no escape codes
         run: |
