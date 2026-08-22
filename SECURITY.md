@@ -6,6 +6,23 @@ or adding new packages to the update list.
 
 ---
 
+## Reporting a Vulnerability
+
+Please do **not** open a public issue for a security flaw in this tool.
+
+Report it privately through GitHub Security Advisories:
+[Report a vulnerability](https://github.com/prasannavarshan/update-toolchain/security/advisories/new)
+
+That opens a private channel visible only to the maintainer until a fix is
+published. Expect an initial response within a week.
+
+Useful things to include: the version or commit, your macOS and Homebrew
+versions, and what an attacker would gain. If the issue is in a tool this script
+*calls* rather than in this script itself, report it upstream — but tell us
+anyway, since we may need to change how we invoke it.
+
+---
+
 ## Threat Model
 
 ### What we are defending against
