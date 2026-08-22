@@ -21,6 +21,7 @@ DRY=false
 AUDIT_ONLY=false
 JSON=false
 COLOR_MODE=auto
+FAIL_ON=never
 for arg in "$@"; do
   case "$arg" in
     --dry)   DRY=true ;;
@@ -29,6 +30,9 @@ for arg in "$@"; do
     --color=always) COLOR_MODE=always ;;
     --color=never)  COLOR_MODE=never ;;
     --color=auto)   COLOR_MODE=auto ;;
+    --fail-on=never) FAIL_ON=never ;;
+    --fail-on=warn)  FAIL_ON=warn ;;
+    --fail-on=error) FAIL_ON=error ;;
     --help)
       echo "Usage: $0 [--dry] [--audit] [--json] [--color=auto|always|never]"
       echo "  --dry     Print commands without executing"
@@ -36,6 +40,12 @@ for arg in "$@"; do
       echo "  --json    Emit a machine-readable report on stdout; progress to stderr"
       echo "  --color   Colour policy. Default auto: on only when stdout is a"
       echo "            terminal and NO_COLOR is unset."
+      echo "  --fail-on Exit 1 when findings reach this level: never (default),"
+      echo "            warn, or error. Default never, so a local run stays"
+      echo "            informational; CI opts in."
+      echo ""
+      echo "Exit codes: 0 clean, 1 findings at or above --fail-on,"
+      echo "            2 the tool itself could not complete."
       exit 0 ;;
     *) echo "Unknown flag: $arg"; exit 1 ;;
   esac
@@ -120,7 +130,7 @@ warn()  { printf "%s[warn]%s  %s\n" "$C_YELLOW"  "$C_RESET" "$*" >&3; echo "[$(_
 err()   { printf "%s[error]%s %s\n" "$C_RED"     "$C_RESET" "$*" >&3; echo "[$(_ts)] [ERROR] $*" >> "$LOG_FILE"; }
 ok()    { printf "%s[ok]%s    %s\n" "$C_GREEN"   "$C_RESET" "$*" >&3; echo "[$(_ts)] [OK]    $*" >> "$LOG_FILE"; }
 sec()   { printf "%s[sec]%s   %s\n" "$C_MAGENTA" "$C_RESET" "$*" >&3; echo "[$(_ts)] [SEC]   $*" >> "$LOG_FILE"; }
-die()   { err "$*"; _finish; exit 1; }
+die()   { err "$*"; _finish; exit 2; }
 # Continuation lines: shown and logged, never tallied as findings of their own.
 # One problem reported as three errors makes the counts useless for alerting.
 detail(){ printf "%s        %s%s\n" "$C_DIM" "$*" "$C_RESET" >&3; echo "[$(_ts)] [DETAIL] $*" >> "$LOG_FILE"; }
@@ -229,6 +239,19 @@ _json_report() {
 _finish() {
   _summary
   if $JSON; then _json_report; fi
+}
+
+_exit_code() {
+  # 0 when findings stay below the --fail-on threshold, 1 when they reach it.
+  # Default never: a local run reports and returns success, so nobody has to
+  # remember a flag to avoid a scary exit status. CI asks for the gate.
+  local n_warn n_err
+  n_warn=$(_tally WARN); n_err=$(_tally ERROR)
+  case "$FAIL_ON" in
+    error) [[ "$n_err" -gt 0 ]] && return 1 ;;
+    warn)  [[ "$n_err" -gt 0 || "$n_warn" -gt 0 ]] && return 1 ;;
+  esac
+  return 0
 }
 
 log "Log → $LOG_FILE"
@@ -427,7 +450,7 @@ sec "PATH check complete"
 if $AUDIT_ONLY; then
   log "Audit-only mode — exiting without updates"
   _finish
-  exit 0
+  _exit_code && exit 0 || exit 1
 fi
 
 # ── 2. HOMEBREW ───────────────────────────────────────────────────────────────
@@ -1304,3 +1327,5 @@ log "SHA snapshot → $SHA_FILE"
 _finish
 
 log "Next: review any [warn] lines above; '--audit' re-checks security posture at any time."
+
+_exit_code && exit 0 || exit 1

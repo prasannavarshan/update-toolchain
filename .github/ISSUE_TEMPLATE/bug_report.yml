@@ -1,0 +1,42 @@
+name: Bug report
+description: Something behaved wrongly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not report security vulnerabilities here.** Use
+        [Security Advisories](../../security/advisories/new) so the report stays
+        private until there is a fix.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, what you got instead.
+      placeholder: |
+        $ update-toolchain --dry
+        ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`update-toolchain --help | head -1`, or the commit SHA"
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Output of `sw_vers -productVersion`, `arch`, and `brew config | head -20`
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Relevant log
+      description: |
+        From `~/.local/share/update-toolchain/`. Redact paths or package names
+        you would rather not publish — the log records your installed toolchain.
+      render: shell

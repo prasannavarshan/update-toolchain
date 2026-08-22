@@ -114,6 +114,43 @@ check "drwxrwxrwt IS other-writable"     "yes" "$(ow_test 'drwxrwxrwt')"
 check "short string is NOT other-writable" "no" "$(ow_test 'drwx')"
 check "empty string is NOT other-writable" "no" "$(ow_test '')"
 
+echo "== _exit_code (--fail-on gate) =="
+
+# _exit_code reads counts back out of the log file, so a fabricated log is
+# enough to drive every branch deterministically.
+gate="$TMP/gate.sh"
+{
+  sed -n '/^_tally() {/,/^}/p' "$SCRIPT"
+  sed -n '/^_exit_code() {/,/^}/p' "$SCRIPT"
+} > "$gate"
+grep -q '_exit_code' "$gate" || { echo "FATAL: could not extract _exit_code"; exit 1; }
+
+gate_test() { # gate_test <fail_on> <n_warn> <n_err> -> exit code
+  ( set -uo pipefail
+    LOG_FILE="$TMP/fake.log"; : > "$LOG_FILE"
+    local i=0
+    while [[ $i -lt $2 ]]; do echo "ts [WARN]  w$i" >> "$LOG_FILE"; i=$((i+1)); done
+    i=0
+    while [[ $i -lt $3 ]]; do echo "ts [ERROR] e$i" >> "$LOG_FILE"; i=$((i+1)); done
+    FAIL_ON="$1"
+    # shellcheck disable=SC1090
+    source "$gate"
+    _exit_code && echo 0 || echo 1 )
+}
+
+# never: always success, however bad the findings. This is the default so that
+# a local run reports without returning a scary status.
+check "never + 0 findings  -> 0" "0" "$(gate_test never 0 0)"
+check "never + warns+errs  -> 0" "0" "$(gate_test never 3 2)"
+# error: only errors gate.
+check "error + 0 findings  -> 0" "0" "$(gate_test error 0 0)"
+check "error + warns only  -> 0" "0" "$(gate_test error 5 0)"
+check "error + 1 error     -> 1" "1" "$(gate_test error 0 1)"
+# warn: either level gates.
+check "warn  + 0 findings  -> 0" "0" "$(gate_test warn 0 0)"
+check "warn  + 1 warning   -> 1" "1" "$(gate_test warn 1 0)"
+check "warn  + 1 error     -> 1" "1" "$(gate_test warn 0 1)"
+
 echo "== read-only modes =="
 
 # 6. --dry and --audit must not prompt for sudo. Grep the source rather than

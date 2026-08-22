@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/prasannavarshan/update-toolchain/security/advisories/new
+    about: Private disclosure. Please do not open a public issue for a security flaw.
