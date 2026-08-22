@@ -183,7 +183,7 @@ govulncheck -mode=binary $(which gitleaks)
 govulncheck -mode=binary $(which osv-scanner)
 ```
 
-This caught 12 vulnerabilities in my `syft` binary — all Go stdlib DoS issues fixed in Go 1.26.6 (the binary was compiled with 1.26.5). Low risk in a local CLI context, but now I *know*.
+On a first run this surfaced a batch of Go stdlib DoS advisories in one of the scanners above — the binary had been compiled against an older Go toolchain than the one that fixed them. Low risk in a local CLI context, and resolved by a rebuild, but the point is that nothing else I ran would have told me.
 
 ### 5. SHA Diff Alerting (The Most Important One)
 
