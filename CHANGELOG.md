@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## v0.2.0
+
+### Changed
+- Install instructions are a single line, and the required `brew trust` step is
+  explained rather than just listed. Homebrew refuses to load formulae from
+  untrusted third-party taps and a tap cannot waive that from its own side, so
+  an unexplained `trust` command in a security tool's README reads like a red
+  flag. Also documents trusting the single formula instead of the whole tap.
+- The Homebrew formula moved to the tap repo
+  ([prasannavarshan/homebrew-tap](https://github.com/prasannavarshan/homebrew-tap)),
+  so there is one copy to update per release rather than two.
+
+## v0.1.0
 
 First public extraction from a private dotfiles repo. Changes made during
 extraction, beyond moving files:
