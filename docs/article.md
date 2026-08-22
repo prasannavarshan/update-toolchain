@@ -33,7 +33,7 @@ The attack surface is your entire toolchain: **compilers, linters, security scan
 
 ## The Architecture: 6 Defense Layers
 
-![Supply Chain Verification Architecture](./supply-chain-architecture.excalidraw.png)
+![Supply Chain Verification Architecture](./supply-chain-architecture.png)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -163,7 +163,7 @@ Here's the insight most developers miss: **compiled binaries embed their entire 
 
 ```bash
 # Generate an SBOM of all your Homebrew binaries
-syft dir:/opt/homebrew/bin -o cyclonedx-json > toolchain-sbom.json
+syft dir:$(brew --prefix)/bin -o cyclonedx-json > toolchain-sbom.json
 
 # Scan for embedded vulnerabilities
 grype sbom:toolchain-sbom.json --only-fixed --fail-on high
@@ -191,7 +191,7 @@ Recording SHA256 hashes is meaningless if you never compare them. The real value
 
 ```bash
 # After every update run, record hashes
-shasum -a 256 /opt/homebrew/bin/trivy >> binary-shas.txt
+shasum -a 256 $(brew --prefix)/bin/trivy >> binary-shas.txt
 
 # On next run, compare:
 # - If SHA changed AND an update was logged → expected ✅
@@ -293,7 +293,7 @@ done
 npm audit signatures
 
 # 4. Generate your first toolchain SBOM
-syft dir:/opt/homebrew/bin -o cyclonedx-json > ~/toolchain-sbom.json
+syft dir:$(brew --prefix)/bin -o cyclonedx-json > ~/toolchain-sbom.json
 grype sbom:~/toolchain-sbom.json --only-fixed
 
 # 5. Scan Go binaries
@@ -336,7 +336,24 @@ done
 
 ---
 
-*The full implementation is a 1,100-line bash script with zero external dependencies. DM me if you want the source.*
+*The full implementation is open source — a 1,300-line bash script with no
+runtime dependencies beyond Homebrew itself:
+
+```bash
+brew tap prasannavarshan/tap
+brew trust prasannavarshan/tap    # Homebrew gates third-party taps
+brew install update-toolchain
+
+update-toolchain --dry            # report; change nothing
+update-toolchain --audit          # security checks only
+```
+
+Source, threat model and known limitations:
+[github.com/prasannavarshan/update-toolchain](https://github.com/prasannavarshan/update-toolchain)
+
+Allowlists are config files rather than code, so nothing updates unless you have
+named it — and the config is parsed, never sourced, because a tool that decides
+what to trust should not let its own config file execute anything.*
 
 ---
 
