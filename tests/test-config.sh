@@ -20,8 +20,7 @@ trap 'rm -rf "$TMP"' EXIT
 # copy of it. load_list depends only on CONFIG_DIR, EXAMPLE_DIR and BREW_PREFIX,
 # so the harness sources the block as-is and then overrides those three.
 harness="$TMP/harness.sh"
-sed -n '/^# ── Config ─/,/^# ── Logging ─/p' "$SCRIPT" \
-  | grep -v '^# ── Logging ─' > "$harness"
+sed -n '/^# ── Config ─/,/^# ── /{ /^# ── [^C]/q; p; }' "$SCRIPT" > "$harness"
 
 grep -q 'load_list()' "$harness" || { echo "FATAL: could not extract load_list"; exit 1; }
 
@@ -85,6 +84,35 @@ if [[ -e "$canary" ]]; then
 else
   ok "config cannot execute code"
 fi
+
+echo "== _other_writable =="
+
+# Extract the predicate itself so the test exercises shipped code.
+ow="$TMP/ow.sh"
+sed -n '/^_other_writable() {/,/^}/p' "$SCRIPT" > "$ow"
+grep -q '_other_writable' "$ow" || { echo "FATAL: could not extract _other_writable"; exit 1; }
+
+ow_test() { # ow_test <mode> -> "yes"/"no"
+  ( set -uo pipefail
+    # shellcheck disable=SC1090
+    source "$ow"
+    if _other_writable "$1"; then echo yes; else echo no; fi )
+}
+
+# Group-writable is Homebrew's own normal layout. Flagging it as world-writable
+# was a false positive on every correctly configured machine.
+check "drwxrwxr-x is NOT other-writable" "no"  "$(ow_test 'drwxrwxr-x')"
+check "drwxr-xr-x is NOT other-writable" "no"  "$(ow_test 'drwxr-xr-x')"
+check "drwx------ is NOT other-writable" "no"  "$(ow_test 'drwx------')"
+# Position 9 is other-write. Position 8 is other-read; an off-by-one here read
+# the wrong column entirely.
+check "drwxrwxrwx IS other-writable"     "yes" "$(ow_test 'drwxrwxrwx')"
+check "drwxr-xrwx IS other-writable"     "yes" "$(ow_test 'drwxr-xrwx')"
+# Sticky /tmp-style: other still has write.
+check "drwxrwxrwt IS other-writable"     "yes" "$(ow_test 'drwxrwxrwt')"
+# Degenerate input must not throw under set -u.
+check "short string is NOT other-writable" "no" "$(ow_test 'drwx')"
+check "empty string is NOT other-writable" "no" "$(ow_test '')"
 
 echo "== read-only modes =="
 

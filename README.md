@@ -58,7 +58,31 @@ git clone https://github.com/prasannavarshan/update-toolchain
 update-toolchain --dry     # report what would change; touches nothing
 update-toolchain --audit   # security checks only, no updates
 update-toolchain           # apply updates
+update-toolchain --json    # machine-readable report on stdout
 ```
+
+Colour follows `--color=auto|always|never`, defaulting to auto: on only when
+stdout is a terminal and [`NO_COLOR`](https://no-color.org) is unset. Redirect
+to a file or a pipe and the output contains no escape codes. Every status also
+carries a text label, so nothing is conveyed by colour alone.
+
+`--json` puts the report on stdout and moves all progress output to stderr, so
+`update-toolchain --json > report.json` yields a file containing only JSON.
+Findings and counts are suitable for feeding a dashboard or an alert:
+
+```json
+{
+  "mode": "audit",
+  "counts": { "ok": 0, "warnings": 2, "errors": 1, "security_checks": 10 },
+  "findings": [
+    { "level": "ERROR", "message": "UNTRUSTED TAP DETECTED: ..." }
+  ]
+}
+```
+
+Every run ends with a summary — counts, a verdict, and the unresolved warnings
+and errors gathered in one place, rather than needing a scroll back through the
+output.
 
 Start with `--dry`. Neither `--dry` nor `--audit` prompts for sudo or modifies
 anything, so both are safe to run in CI or a container.
