@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest a check, a flag, or a change in behaviour
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: The situation you are in, not the implementation you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like it to do
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      description: See CONTRIBUTING.md. Tick what you have considered.
+      options:
+        - label: Works on stock macOS bash 3.2
+        - label: Does not require sourcing config as shell code
+        - label: Skips cleanly when a required binary is absent
+        - label: Would not fire on a correctly configured machine

@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `--fail-on=never|warn|error`, so a run can gate a pipeline. Default `never`:
+  findings are reported without failing, which keeps a local check
+  informational; CI opts in explicitly.
+- `CONTRIBUTING.md` recording the constraints that are easy to violate — bash
+  3.2, config-as-data, read-only modes staying read-only, and the
+  `grep`-under-`pipefail` trap that shipped as a real bug.
+- Issue templates, with security reports routed to private advisories rather
+  than public issues.
+
+### Changed
+- **Breaking:** a failure of the tool itself now exits `2` rather than `1`,
+  leaving `1` to mean "findings at or above the threshold". A pipeline has to be
+  able to distinguish "this machine has a problem" from "this tool broke";
+  conflating them is a known scanner anti-pattern.
+
 ## v0.3.0
 
 ### Added

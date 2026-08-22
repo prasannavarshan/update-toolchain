@@ -61,6 +61,25 @@ update-toolchain           # apply updates
 update-toolchain --json    # machine-readable report on stdout
 ```
 
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | clean, or findings below the `--fail-on` threshold |
+| `1` | findings at or above `--fail-on` |
+| `2` | the tool itself could not complete |
+
+Findings do **not** fail the run by default, so a local check reports without
+returning a scary status. CI opts in:
+
+```bash
+update-toolchain --audit --fail-on=error   # exit 1 on any error
+update-toolchain --audit --fail-on=warn    # exit 1 on any warning too
+```
+
+The exit code is independent of `--json`, so the report is still written when
+the gate trips and a pipeline can upload it before failing.
+
 Colour follows `--color=auto|always|never`, defaulting to auto: on only when
 stdout is a terminal and [`NO_COLOR`](https://no-color.org) is unset. Redirect
 to a file or a pipe and the output contains no escape codes. Every status also
