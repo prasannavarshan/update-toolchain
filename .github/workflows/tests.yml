@@ -1,0 +1,74 @@
+name: tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+# Deny by default; each job takes only what it needs.
+permissions: {}
+
+jobs:
+  test:
+    name: tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # The tool is depends_on :macos. Both arches, because the config loader
+        # expands ${BREW_PREFIX} and that differs between them.
+        os: [ macos-26, macos-26-intel ]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Syntax check
+        run: bash -n bin/update-toolchain
+
+      - name: Unit tests
+        run: ./tests/test-config.sh
+
+      # --dry and --audit must never prompt for sudo or mutate anything. A CI
+      # runner is the honest test of that: there is no TTY and no password.
+      - name: Read-only modes must run non-interactively
+        run: |
+          ./bin/update-toolchain --dry   > /dev/null
+          ./bin/update-toolchain --audit > /dev/null
+
+      - name: Piped output must contain no escape codes
+        run: |
+          ./bin/update-toolchain --audit > out.txt 2>&1
+          if LC_ALL=C grep -q $'\033' out.txt; then
+            echo "::error::ANSI escape codes leaked into non-TTY output"
+            exit 1
+          fi
+
+      - name: --json must emit valid JSON on stdout only
+        run: |
+          ./bin/update-toolchain --audit --json > report.json 2> progress.err
+          python3 -m json.tool report.json > /dev/null
+          test -s progress.err || { echo "::error::progress did not go to stderr"; exit 1; }
+
+  lint:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+
+      # Gated at error severity, which is currently clean. Warnings are printed
+      # for information but do not fail the build: a linter that goes red on
+      # arrival just gets ignored, and there is a small backlog of style
+      # warnings to work through deliberately.
+      - name: Errors (blocking)
+        run: shellcheck -S error bin/update-toolchain tests/test-config.sh
+
+      - name: Warnings (advisory)
+        continue-on-error: true
+        run: shellcheck -S warning bin/update-toolchain tests/test-config.sh
