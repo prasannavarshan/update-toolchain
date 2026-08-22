@@ -1,0 +1,13 @@
+# provenance-formulae — one entry per line. '#' starts a comment.
+# Copy to $XDG_CONFIG_HOME/update-toolchain/provenance-formulae (default ~/.config/update-toolchain/provenance-formulae)
+# and edit for your machine. Without a user copy, this example is used as the default.
+
+trivy  # security scanner — highest priority
+semgrep  # SAST scanner
+gitleaks  # secret scanner
+osv-scanner  # vulnerability scanner
+gh  # GitHub CLI (used for attestation verification itself)
+jq  # JSON parser (used in security pipelines)
+node  # Node.js runtime
+python@3.13  # Python runtime
+go  # Go toolchain

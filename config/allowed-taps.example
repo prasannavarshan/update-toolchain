@@ -1,0 +1,30 @@
+# allowed-taps — one entry per line. '#' starts a comment.
+# Copy to $XDG_CONFIG_HOME/update-toolchain/allowed-taps (default ~/.config/update-toolchain/allowed-taps)
+# and edit for your machine. Without a user copy, this example is used as the default.
+
+homebrew/core
+homebrew/cask
+homebrew/cask-fonts
+homebrew/cask-versions
+homebrew/services
+# Infrastructure / cloud — well-known vendors
+aws/tap
+hashicorp/tap
+# Kubernetes tooling — well-known
+clowdhaus/taps
+danielfoehrkn/switch
+hidetatz/tap
+johanhaleby/kubetail
+k8sgpt-ai/k8sgpt
+robscott/tap
+# Databases — well-known vendors
+mongodb/brew
+redis-developer/tap
+# Shell / prompt
+romkatv/powerlevel10k
+# AI tooling — review periodically
+gofireflyio/aiac
+# Engram persistent memory — reviewed 2026-08-07, all formulae GoReleaser binaries + SHA256
+gentleman-programming/tap
+# Kubernetes networking — Ambassador Labs / Datawire (Telepresence)
+datawire/blackbird

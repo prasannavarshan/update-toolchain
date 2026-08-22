@@ -1,0 +1,24 @@
+# record-binaries — one entry per line. '#' starts a comment.
+# Copy to $XDG_CONFIG_HOME/update-toolchain/record-binaries (default ~/.config/update-toolchain/record-binaries)
+# and edit for your machine. Without a user copy, this example is used as the default.
+
+brew
+node
+npm
+pnpm
+yarn
+python3
+go
+cargo
+rustup
+pulumi
+uv
+pyenv
+pipx
+ollama
+# Supply-chain verification tools
+syft
+grype
+cosign
+govulncheck
+cargo-audit

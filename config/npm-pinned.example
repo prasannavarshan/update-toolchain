@@ -1,0 +1,13 @@
+# npm-pinned — one entry per line. '#' starts a comment.
+# Copy to $XDG_CONFIG_HOME/update-toolchain/npm-pinned (default ~/.config/update-toolchain/npm-pinned)
+# and edit for your machine. Without a user copy, this example is used as the default.
+
+@anthropic-ai/claude-code  # npm is the only update path when downloads.claude.ai is proxy-blocked
+@openai/codex
+agent-browser
+aws-cdk
+context-mode
+mcp-remote
+openwork
+playwright
+redis-commander
