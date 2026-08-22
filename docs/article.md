@@ -346,7 +346,7 @@ done
 
 ---
 
-*The full implementation is open source — a 1,300-line bash script with no
+The full implementation is open source — a 1,300-line bash script with no
 runtime dependencies beyond Homebrew itself:
 
 ```bash
@@ -363,7 +363,7 @@ Source, threat model and known limitations:
 
 Allowlists are config files rather than code, so nothing updates unless you have
 named it — and the config is parsed, never sourced, because a tool that decides
-what to trust should not let its own config file execute anything.*
+what to trust should not let its own config file execute anything.
 
 ---
 
