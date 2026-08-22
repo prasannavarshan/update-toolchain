@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## v0.4.0
+
+Still `0.x` deliberately. The interface gained three flags in a day and seven
+bugs were fixed in the same span; `0.x` is the honest signal that it is still
+moving. Exit codes are the closest thing here to a contract, so treat a change
+to them as breaking whenever it happens.
 
 ### Added
 - `--fail-on=never|warn|error`, so a run can gate a pipeline. Default `never`:
