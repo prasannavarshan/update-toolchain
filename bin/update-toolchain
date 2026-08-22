@@ -1034,7 +1034,7 @@ if require syft "brew install syft"; then
   SBOM_FILE="${LOG_DIR}/toolchain-sbom-$(date -u +%Y%m%d).json"
 
   if $DRY; then
-    echo "  (dry-run) syft dir:"$BREW_PREFIX"/bin -o cyclonedx-json > $SBOM_FILE"
+    echo "  (dry-run) syft dir:${BREW_PREFIX}/bin -o cyclonedx-json > ${SBOM_FILE}"
     echo "  (dry-run) grype sbom:$SBOM_FILE --only-fixed --fail-on high"
   else
     log "  Generating SBOM for $BREW_PREFIX/bin…"
