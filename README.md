@@ -30,8 +30,14 @@ that should stay your decision.
 
 ```bash
 brew tap prasannavarshan/tap
+brew trust prasannavarshan/tap      # Homebrew gates third-party taps
 brew install update-toolchain
 ```
+
+Recent Homebrew refuses to load a formula from an untrusted third-party tap, so
+the `brew trust` step is required, not optional. Read the formula first if you
+would rather not take that on faith — it installs one bash script and a
+directory of example config.
 
 Or run it straight from a clone — there is no build step:
 
