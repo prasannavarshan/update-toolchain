@@ -1,0 +1,8 @@
+# codesign-targets — one entry per line. '#' starts a comment.
+# Copy to $XDG_CONFIG_HOME/update-toolchain/codesign-targets (default ~/.config/update-toolchain/codesign-targets)
+# and edit for your machine. Without a user copy, this example is used as the default.
+
+${BREW_PREFIX}/bin/gh  # GitHub CLI — Apple-notarized
+${BREW_PREFIX}/bin/docker  # Docker — Apple-notarized
+/Applications/Visual Studio Code.app/Contents/MacOS/Electron  # VS Code
+/Applications/Ollama.app/Contents/MacOS/Ollama  # Ollama app bundle

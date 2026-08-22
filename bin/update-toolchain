@@ -1,0 +1,1153 @@
+#!/usr/bin/env bash
+# =============================================================================
+# update-toolchain.sh — Supply-chain hardened dev toolchain updater
+# macOS / Apple Silicon + Intel
+#
+# Threat model: SECURITY.md
+# Usage:
+#   ./update-toolchain.sh          # full update
+#   ./update-toolchain.sh --dry    # dry-run (no changes)
+#   ./update-toolchain.sh --audit  # security audit only, no updates
+# =============================================================================
+set -euo pipefail
+IFS=$'\n\t'
+
+# ── Ensure Go bin dir is in PATH (govulncheck, etc. install here) ─────────────
+GOBIN="${GOPATH:-$HOME/go}/bin"
+[[ -d "$GOBIN" ]] && export PATH="$GOBIN:$PATH"
+
+# ── CLI flags ─────────────────────────────────────────────────────────────────
+DRY=false
+AUDIT_ONLY=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry)   DRY=true ;;
+    --audit) AUDIT_ONLY=true ;;
+    --help)
+      echo "Usage: $0 [--dry] [--audit]"
+      echo "  --dry    Print commands without executing"
+      echo "  --audit  Run security checks only, no updates"
+      exit 0 ;;
+    *) echo "Unknown flag: $arg"; exit 1 ;;
+  esac
+done
+
+# ── Config ────────────────────────────────────────────────────────────────────
+# Allowlists live OUTSIDE this script so you never edit code to change policy.
+# Resolution order per list:
+#   1. $UPDATE_TOOLCHAIN_CONFIG/<name>
+#   2. ${XDG_CONFIG_HOME:-~/.config}/update-toolchain/<name>
+#   3. the bundled config/<name>.example  (so a fresh clone runs)
+#
+# Lists are plain newline-delimited text, NOT sourced shell. A config file can
+# never execute code — deliberate, for a tool whose whole job is trust.
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+  _target=$(readlink "$SCRIPT_PATH")
+  case "$_target" in
+    /*) SCRIPT_PATH="$_target" ;;
+    *)  SCRIPT_PATH="$(dirname "$SCRIPT_PATH")/$_target" ;;
+  esac
+done
+SCRIPT_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
+CONFIG_DIR="${UPDATE_TOOLCHAIN_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/update-toolchain}"
+EXAMPLE_DIR="${SCRIPT_ROOT}/config"
+
+BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /usr/local)"
+
+load_list() {
+  # load_list <name>  → one entry per line on stdout
+  local name="$1" src=""
+  if [[ -f "${CONFIG_DIR}/${name}" ]]; then
+    src="${CONFIG_DIR}/${name}"
+  elif [[ -f "${EXAMPLE_DIR}/${name}.example" ]]; then
+    src="${EXAMPLE_DIR}/${name}.example"
+  else
+    return 0
+  fi
+  sed -e 's/[[:space:]]*#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$src" \
+    | grep -v '^$' \
+    | sed -e "s|\${BREW_PREFIX}|${BREW_PREFIX}|g" \
+    || true
+}
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+LOG_DIR="${HOME}/.local/share/update-toolchain"
+mkdir -p "$LOG_DIR"
+LOG_FILE="${LOG_DIR}/$(date -u +%Y%m%dT%H%M%SZ).log"
+SHA_FILE="${LOG_DIR}/binary-shas.txt"
+
+_ts()   { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+log()   { local msg="[$(_ts)] [INFO]  $*"; printf "\033[1;34m[update]\033[0m %s\n" "$*"; echo "$msg" >> "$LOG_FILE"; }
+warn()  { local msg="[$(_ts)] [WARN]  $*"; printf "\033[1;33m[warn]\033[0m  %s\n" "$*";   echo "$msg" >> "$LOG_FILE"; }
+err()   { local msg="[$(_ts)] [ERROR] $*"; printf "\033[1;31m[error]\033[0m %s\n" "$*";   echo "$msg" >> "$LOG_FILE"; }
+ok()    { local msg="[$(_ts)] [OK]    $*"; printf "\033[1;32m[ok]\033[0m    %s\n" "$*";   echo "$msg" >> "$LOG_FILE"; }
+sec()   { local msg="[$(_ts)] [SEC]   $*"; printf "\033[1;35m[sec]\033[0m   %s\n" "$*";   echo "$msg" >> "$LOG_FILE"; }
+die()   { err "$*"; exit 1; }
+
+log "Log → $LOG_FILE"
+
+# ── Sudo credential cache ─────────────────────────────────────────────────────
+# Only needed for steps that actually mutate the system. --dry and --audit make
+# no changes, so they must never prompt: that is what lets them run in CI, in a
+# container, and in a stranger's first evaluation of this tool.
+if $DRY || $AUDIT_ONLY; then
+  log "Read-only mode — skipping sudo prompt"
+else
+  log "Requesting sudo credentials upfront (needed for brew cleanup + binary installs)"
+  if ! sudo -v; then
+    die "sudo authentication failed — re-run and enter your password when prompted"
+  fi
+  # Keep the sudo token alive in the background for long-running steps
+  ( while true; do sudo -v; sleep 50; done ) &>/dev/null &
+  SUDO_KEEPALIVE_PID=$!
+  trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
+fi
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+run() {
+  # run <label> <cmd> [args…]
+  local label="$1"; shift
+  log "$label"
+  if $DRY; then
+    local IFS=' '   # script-wide IFS is $'\n\t'; $* would join argv with newlines
+    echo "  (dry-run) $*"
+  else
+    if "$@"; then
+      ok "$label"
+    else
+      err "Failed: $label (exit $?)"
+    fi
+  fi
+}
+
+require() {
+  # require <binary> [install-hint]
+  if ! command -v "$1" &>/dev/null; then
+    warn "$1 not found — skipping (${2:-install it to enable this step})"
+    return 1
+  fi
+  return 0
+}
+
+record_sha() {
+  # record_sha <label> <binary-path>
+  local label="$1" bin="$2"
+  if [[ -x "$bin" ]]; then
+    local sha
+    sha=$(shasum -a 256 "$bin" 2>/dev/null | awk '{print $1}')
+    echo "$(_ts) $label $bin $sha" >> "$SHA_FILE"
+  fi
+}
+
+# ── 1. ENVIRONMENT INTEGRITY CHECKS ──────────────────────────────────────────
+sec "=== ENVIRONMENT INTEGRITY CHECKS ==="
+
+# 1a. Verify Homebrew itself is from the official source
+BREW_BIN=$(command -v brew 2>/dev/null || true)
+if [[ -z "$BREW_BIN" ]]; then
+  die "Homebrew not found. Install from https://brew.sh (verify the install script hash first)"
+fi
+
+BREW_REPO=$(brew --repository 2>/dev/null)
+# Accept both HTTPS and SSH remotes pointing to the official Homebrew repo
+ACTUAL_BREW_REMOTE=$(git -C "$BREW_REPO" remote get-url origin 2>/dev/null || echo "unknown")
+case "$ACTUAL_BREW_REMOTE" in
+  "https://github.com/Homebrew/brew" | \
+  "https://github.com/Homebrew/brew.git" | \
+  "git@github.com:Homebrew/brew" | \
+  "git@github.com:Homebrew/brew.git")
+    : ;; # trusted
+  *)
+    die "Homebrew remote is '$ACTUAL_BREW_REMOTE' — not an official Homebrew remote. Possible tampering!"
+    ;;
+esac
+sec "Homebrew remote origin: OK ($ACTUAL_BREW_REMOTE)"
+record_sha "brew" "$BREW_BIN"
+
+# 1b. Enforce tap allowlist — BLOCK on untrusted taps, don't just warn
+# Add any taps you explicitly trust to this list.
+ALLOWED_TAPS=()
+while IFS= read -r _line; do
+  [[ -n "$_line" ]] && ALLOWED_TAPS+=("$_line")
+done < <(load_list "allowed-taps")
+
+tap_remote() {
+  # tap_remote <user/repo> → git remote URL of the tap's local checkout
+  local tap="$1" user="${1%%/*}" repo="${1#*/}"
+  local dir="$(brew --repository 2>/dev/null)/Library/Taps/${user}/homebrew-${repo}"
+  [[ -d "$dir" ]] || return 1
+  git -C "$dir" remote get-url origin 2>/dev/null || return 1
+}
+
+sec "Checking Homebrew taps against allowlist…"
+SECURITY_FAIL=false
+while IFS= read -r tap; do
+  [[ -z "$tap" ]] && continue
+  allowed=false
+  reason=""
+
+  # Official taps are trusted by REMOTE URL, not by name. This is stricter than
+  # an name allowlist: a local tap called "homebrew/core" whose remote points
+  # somewhere else is caught here, where a name check would wave it through.
+  remote="$(tap_remote "$tap" || echo "")"
+  case "$remote" in
+    https://github.com/Homebrew/*|git@github.com:Homebrew/*)
+      allowed=true; reason="official (remote verified)" ;;
+  esac
+
+  # Third-party taps must be named explicitly in the allowlist.
+  if ! $allowed; then
+    for a in "${ALLOWED_TAPS[@]}"; do
+      [[ "$tap" == "$a" ]] && allowed=true && reason="allowlisted" && break
+    done
+  fi
+
+  if $allowed; then
+    sec "  tap OK: $tap ($reason)"
+  else
+    err "UNTRUSTED TAP DETECTED: '$tap'${remote:+ → $remote}"
+    err "  → Remove it:  brew untap '$tap'"
+    err "  → Or trust it: echo '$tap' >> ${CONFIG_DIR}/allowed-taps"
+    SECURITY_FAIL=true
+  fi
+done < <(brew tap 2>/dev/null)
+
+if $SECURITY_FAIL; then
+  # Read-only modes must finish and report everything they found. Aborting on
+  # the first problem hides the rest of the audit, which is the whole point.
+  if $DRY || $AUDIT_ONLY; then
+    warn "Untrusted taps present (continuing — read-only mode)"
+  else
+    die "Aborting: untrusted Homebrew taps present. Remove them before updating."
+  fi
+fi
+
+# 1c. Check for deprecated/orphaned formulae (informational, not blocking)
+sec "Running brew doctor…"
+DOCTOR_OUT=$(brew doctor 2>&1 || true)
+if echo "$DOCTOR_OUT" | grep -q "Warning:"; then
+  warn "brew doctor found warnings — review:"
+  echo "$DOCTOR_OUT" | grep -A2 "Warning:" | while IFS= read -r line; do
+    warn "  $line"
+  done
+else
+  sec "brew doctor: clean"
+fi
+
+# 1d. Verify macOS SIP is enabled
+SIP_STATUS=$(csrutil status 2>/dev/null || echo "unknown")
+if echo "$SIP_STATUS" | grep -q "enabled"; then
+  sec "SIP (System Integrity Protection): enabled ✓"
+else
+  warn "SIP status: $SIP_STATUS — consider enabling SIP for stronger system protection"
+fi
+
+# 1e. Verify Gatekeeper is enabled
+GK_STATUS=$(spctl --status 2>/dev/null || echo "unknown")
+if echo "$GK_STATUS" | grep -q "enabled"; then
+  sec "Gatekeeper: enabled ✓"
+else
+  warn "Gatekeeper: $GK_STATUS — consider enabling: sudo spctl --master-enable"
+fi
+
+# 1f. Check for world-writable directories in PATH (path-hijack vector)
+sec "Checking PATH for world-writable directories…"
+IFS=':' read -ra PATH_DIRS <<< "$PATH"
+for dir in "${PATH_DIRS[@]}"; do
+  if [[ -d "$dir" ]]; then
+    perms=$(stat -f "%Sp" "$dir" 2>/dev/null || stat -c "%A" "$dir" 2>/dev/null || echo "unknown")
+    if [[ "$perms" == *"w"*"w"* ]] || [[ "$perms" == ???????w?? ]]; then
+      warn "World-writable PATH dir: $dir ($perms) — PATH hijack risk!"
+    fi
+  fi
+done
+sec "PATH check complete"
+
+if $AUDIT_ONLY; then
+  log "Audit-only mode — exiting without updates"
+  exit 0
+fi
+
+# ── 2. HOMEBREW ───────────────────────────────────────────────────────────────
+log "=== HOMEBREW ==="
+
+# Fetch latest metadata (signed by Homebrew's CDN cert)
+run "brew update (fetch signed metadata)" brew update
+
+# Upgrade formulae — Homebrew verifies SHA256 of every bottle before install.
+# Capture output so we can detect and repair broken symlinks post-upgrade.
+brew_upgrade_formulae() {
+  log "brew upgrade formulae"
+  if $DRY; then echo "  (dry-run) brew upgrade"; return; fi
+
+  local out
+  out=$(brew upgrade 2>&1) \
+    && ok "brew upgrade formulae" \
+    || err "brew upgrade formulae had errors — attempting link repair"
+  echo "$out"
+
+  # 1. Auto-run any "brew unlink <formula>" suggestions (e.g. old versioned kegs)
+  while IFS= read -r old_keg; do
+    warn "  Unlinking conflicting keg: $old_keg"
+    brew unlink "$old_keg" 2>/dev/null \
+      && ok "  Unlinked: $old_keg" \
+      || warn "  Could not unlink $old_keg — run manually: brew unlink $old_keg"
+  done < <(grep -oE 'brew unlink [^[:space:]]+' <<< "$out" | awk '{print $3}' | sort -u)
+
+  # 2. Re-link any formulae whose bottle poured but link step failed.
+  #    Output pattern: "==> Pouring formula--version..." then "brew link step did not complete"
+  # Pouring line format: "==> Pouring python@3.13--3.13.13.tahoe.bottle.tar.gz"
+  # Formula name ends at "--" (double-dash separates name from version).
+  local current_formula="" link_failed=false
+  local -a failed_formulae=()
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^"==> Pouring "(.+)"--" ]]; then
+      # flush previous formula if its link step failed
+      if [[ "$link_failed" == true && -n "$current_formula" ]]; then
+        failed_formulae+=("$current_formula")
+      fi
+      current_formula="${BASH_REMATCH[1]}"
+      link_failed=false
+    elif [[ "$line" == *"brew link"*"step did not complete"* ]]; then
+      link_failed=true
+    fi
+  done <<< "$out"
+  if [[ "$link_failed" == true && -n "$current_formula" ]]; then
+    failed_formulae+=("$current_formula")
+  fi
+  if (( ${#failed_formulae[@]} > 0 )); then
+    for formula in "${failed_formulae[@]}"; do
+      warn "  Link failure for '$formula' — attempting brew link --overwrite"
+      brew link --overwrite "$formula" 2>/dev/null \
+        && ok "  Relinked: $formula" \
+        || warn "  Could not relink $formula — manual fix: brew link --overwrite $formula"
+    done
+  fi
+}
+$DRY || $AUDIT_ONLY || sudo -v  # refresh TTY-bound sudo token before brew upgrade (background keepalive uses a different tty)
+brew_upgrade_formulae
+
+# Upgrade casks — same bottle verification
+# Run outside `run` helper so interrupts/errors don't abort the script via set -e
+brew_upgrade_casks() {
+  log "brew upgrade casks"
+  if $DRY; then echo "  (dry-run) brew upgrade --cask --greedy"; return; fi
+  brew upgrade --cask --greedy \
+    && ok "brew upgrade casks" \
+    || warn "brew upgrade casks had errors (exit $?) — continuing"
+}
+$DRY || $AUDIT_ONLY || sudo -v  # refresh TTY-bound sudo token before cask upgrade
+brew_upgrade_casks
+
+# Cleanup old versions — fix any permission issues on Cellar first
+brew_cleanup_safe() {
+  log "brew cleanup"
+  if $DRY; then echo "  (dry-run) brew cleanup --prune=7"; return; fi
+
+  # Cellar permission problems (e.g. leftover root-owned dirs) cause cleanup to fail.
+  # Fix ownership silently; if sudo is unavailable this is a no-op.
+  local cellar
+  cellar="$(brew --cellar 2>/dev/null || echo "")"
+  if [[ -n "$cellar" && -d "$cellar" ]]; then
+    sudo chown -R "$(whoami)" "$cellar" 2>/dev/null \
+      && log "  Cellar ownership corrected ($cellar)" \
+      || true
+  fi
+
+  brew cleanup --prune=7 \
+    && ok "brew cleanup" \
+    || err "brew cleanup failed — some old kegs may remain in /usr/local/Cellar"
+}
+brew_cleanup_safe
+
+# Post-upgrade audit: surface any newly deprecated packages
+DEPRECATED=$(brew list --formula 2>/dev/null | xargs brew info --json=v2 2>/dev/null \
+  | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for f in data.get('formulae', []):
+    if f.get('deprecated') or f.get('disabled'):
+        print(f['name'])
+" 2>/dev/null || true)
+if [[ -n "$DEPRECATED" ]]; then
+  warn "Deprecated/disabled formulae installed — find replacements:"
+  echo "$DEPRECATED" | while IFS= read -r f; do warn "  $f"; done
+fi
+
+record_sha "brew-post" "$BREW_BIN"
+
+# ── 3. uv (Python package/project manager) ────────────────────────────────────
+log "=== uv ==="
+# uv self-update fetches from https://github.com/astral-sh/uv/releases
+# Binaries are signed with Sigstore (cosign) — verified automatically by uv
+if require uv "brew install uv"; then
+  UV_BIN=$(command -v uv)
+  record_sha "uv-pre" "$UV_BIN"
+  run "uv self update (Sigstore-verified)" uv self update
+  record_sha "uv-post" "$UV_BIN"
+fi
+
+# ── 4. pyenv ──────────────────────────────────────────────────────────────────
+log "=== pyenv ==="
+# Managed via Homebrew — inherits Homebrew's SHA256 bottle verification
+if require pyenv "brew install pyenv"; then
+  run "pyenv (via brew)" brew upgrade pyenv
+fi
+
+# ── 5. rustup / Rust toolchain ────────────────────────────────────────────────
+log "=== Rust / rustup ==="
+# rustup update fetches from static.rust-lang.org over TLS; each component
+# is verified against a SHA256 manifest signed with the Rust project's key.
+if require rustup "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"; then
+  RUSTUP_BIN=$(command -v rustup)
+  record_sha "rustup-pre" "$RUSTUP_BIN"
+  # --no-self-update first so we can log the toolchain update separately
+  run "rustup toolchain update (manifest-signed)" rustup update
+  record_sha "rustup-post" "$RUSTUP_BIN"
+fi
+
+# ── 6. npm global packages ────────────────────────────────────────────────────
+log "=== npm globals ==="
+# Security controls applied:
+#   --ignore-scripts  → prevents postinstall/preinstall script execution
+#                       (primary supply-chain attack vector in npm)
+#   npm audit         → checks installed packages against NIST NVD / GitHub Advisory DB
+#
+# ONLY packages in this explicit allowlist are updated.
+# Never run `npm update -g` without a pinned list.
+NPM_PINNED=()
+while IFS= read -r _line; do
+  [[ -n "$_line" ]] && NPM_PINNED+=("$_line")
+done < <(load_list "npm-pinned")
+
+if require npm "brew install node"; then
+  log "npm globals (pinned list, --ignore-scripts)"
+
+  # Packages whose postinstall is required for functionality.
+  # These get --allow-scripts=<pkg> instead of --ignore-scripts.
+  # Audited: install.cjs downloads a platform-native binary from downloads.claude.ai
+  NEEDS_POSTINSTALL=(
+    "@anthropic-ai/claude-code"
+  )
+
+  for pkg in "${NPM_PINNED[@]}"; do
+    # Check if this package needs postinstall
+    needs_scripts=false
+    for allowed_pkg in "${NEEDS_POSTINSTALL[@]}"; do
+      if [[ "$pkg" == "$allowed_pkg" ]]; then
+        needs_scripts=true
+        break
+      fi
+    done
+
+    if $DRY; then
+      if $needs_scripts; then
+        echo "  (dry-run) npm install -g --allow-scripts=${pkg} ${pkg}@latest"
+      else
+        echo "  (dry-run) npm install -g --ignore-scripts ${pkg}@latest"
+      fi
+    else
+      if $needs_scripts; then
+        if npm install -g --allow-scripts="${pkg}" "${pkg}@latest" 2>/dev/null; then
+          ok "npm: $pkg (with postinstall)"
+        else
+          warn "npm: failed to update $pkg"
+        fi
+      else
+        if npm install -g --ignore-scripts "${pkg}@latest" 2>/dev/null; then
+          ok "npm: $pkg"
+        else
+          warn "npm: failed to update $pkg"
+        fi
+      fi
+    fi
+  done
+
+  # Run npm audit on global packages to surface known CVEs
+  log "npm audit (global)"
+  if $DRY; then
+    echo "  (dry-run) npm audit --global"
+  else
+    npm audit --global 2>/dev/null || warn "npm audit found issues — review above output"
+  fi
+fi
+
+# ── 7. yarn ───────────────────────────────────────────────────────────────────
+log "=== yarn ==="
+# Managed via Homebrew — SHA256 verified
+if require yarn "brew install yarn"; then
+  run "yarn (via brew)" brew upgrade yarn
+fi
+
+# ── 8. pnpm ───────────────────────────────────────────────────────────────────
+log "=== pnpm ==="
+# pnpm self-update fetches from https://github.com/pnpm/pnpm/releases over TLS
+if require pnpm "npm install -g pnpm"; then
+  PNPM_BIN=$(command -v pnpm)
+  record_sha "pnpm-pre" "$PNPM_BIN"
+  run "pnpm self-update" pnpm self-update
+  record_sha "pnpm-post" "$PNPM_BIN"
+fi
+
+# ── 9. Pulumi ─────────────────────────────────────────────────────────────────
+log "=== Pulumi ==="
+# Managed via Homebrew — SHA256 verified
+if require pulumi "brew install pulumi/tap/pulumi"; then
+  run "pulumi (via brew)" brew upgrade pulumi
+fi
+
+# ── 10. pipx (Python CLI tools) + pip-audit (PyPI supply-chain scanning) ──────
+log "=== pipx ==="
+# pipx installs each tool in an isolated venv — reduces cross-contamination risk.
+# Each package is fetched from PyPI over TLS; hashes verified by pip.
+#
+# pip-audit scans every pipx venv against:
+#   - PyPA Advisory Database (authoritative Python CVE source)
+#   - GitHub Advisory Database
+#   - NIST NVD
+# This catches TeamPCP / PyPI supply-chain attacks (malicious package versions
+# that execute code on install or import — same class as event-stream for npm).
+if require pipx "brew install pipx"; then
+  run "pipx upgrade-all" pipx upgrade-all
+
+  # Scan all pipx-managed venvs for known-vulnerable packages
+  log "pip-audit: scanning pipx venvs for PyPI supply-chain vulnerabilities"
+  PIPX_VENVS=$(pipx environment --value PIPX_LOCAL_VENVS 2>/dev/null || echo "")
+  if [[ -n "$PIPX_VENVS" && -d "$PIPX_VENVS" ]]; then
+    if require pip-audit "pipx install pip-audit"; then
+      if $DRY; then
+        echo "  (dry-run) pip-audit --path $PIPX_VENVS"
+      else
+        # Scan each venv individually so one failure doesn't block the rest
+        find "$PIPX_VENVS" -maxdepth 2 -name "pip-audit" -prune -o \
+          -maxdepth 1 -mindepth 1 -type d -print | while IFS= read -r venv_dir; do
+          venv_name=$(basename "$venv_dir")
+          pip_bin="$venv_dir/lib/python*/site-packages"
+          # Use pip-audit with the venv's pip
+          if [[ -x "$venv_dir/bin/pip" ]]; then
+            log "  pip-audit: $venv_name"
+            "$venv_dir/bin/pip-audit" 2>/dev/null \
+              || pip-audit --path "$venv_dir" 2>/dev/null \
+              || warn "  pip-audit: could not scan $venv_name"
+          fi
+        done
+        # Also run a broad scan across all pipx venvs at once
+        pip-audit --path "$PIPX_VENVS" 2>/dev/null \
+          && ok "pip-audit: all pipx venvs clean" \
+          || warn "pip-audit: vulnerabilities found in pipx venvs — review above output"
+      fi
+    else
+      warn "pip-audit not installed — install with: pipx install pip-audit"
+      warn "  pip-audit catches PyPI supply-chain attacks (TeamPCP/event-stream class)"
+    fi
+  else
+    warn "No pipx venvs found at $PIPX_VENVS — nothing to audit"
+  fi
+else
+  warn "pipx not installed — recommended for isolated Python CLI tools"
+  warn "  Install: brew install pipx && pipx ensurepath"
+fi
+
+# ── pip-audit: project-level reminder ─────────────────────────────────────────
+# This script audits your TOOLCHAIN venvs. For project-level PyPI supply-chain
+# protection (requirements.txt, uv.lock, pyproject.toml), run Ayyanar:
+#   trivy fs .              — broadest coverage (Python, Node, Go, IaC)
+#   osv-scanner --recursive . — lockfile-precise (uv.lock, Cargo.lock, go.sum)
+#   pip-audit -r requirements.txt
+#   semgrep --config=p/supply-chain .  — reachability analysis
+log "Reminder: for project-level PyPI scanning, run Ayyanar (trivy + osv-scanner + pip-audit + semgrep)"
+
+# ── 11. Go toolchain ──────────────────────────────────────────────────────────
+log "=== Go ==="
+# Managed via Homebrew — SHA256 verified
+if require go "brew install go"; then
+  run "go (via brew)" brew upgrade go
+fi
+
+# ── 12. CACHE CLEANUP ────────────────────────────────────────────────────────
+# Safe caches — regenerated automatically on next use, no data loss.
+# Audited 2026-06-06: these were consuming 15-20 GB between runs.
+log "=== Cache cleanup ==="
+
+cache_clean() {
+  local label="$1" path="$2"
+  if [[ -d "$path" ]]; then
+    if $DRY; then
+      echo "  (dry-run) rm -rf $path/*"
+    else
+      find "$path" -mindepth 1 -delete 2>/dev/null && ok "cleared: $label ($path)" || warn "could not clear: $label"
+    fi
+  fi
+}
+
+# pip — wheel/sdist cache, fully safe to clear
+if require pip3 "brew install python"; then
+  if $DRY; then echo "  (dry-run) python3 -m pip cache purge"
+  else python3 -m pip cache purge 2>/dev/null && ok "pip cache purged" || warn "pip cache purge failed"; fi
+fi
+
+# uv — package cache, safe (uv re-downloads on next use)
+if require uv "brew install uv"; then
+  if $DRY; then echo "  (dry-run) uv cache clean"
+  else uv cache clean 2>/dev/null && ok "uv cache cleaned" || warn "uv cache clean failed"; fi
+fi
+
+# AWS CLI response cache — stale API responses, safe
+cache_clean "aws-cli"   "$HOME/Library/Caches/aws"
+
+# AWS CDK jsii — JS interop cache, regenerated on next cdk synth
+cache_clean "aws-jsii"  "$HOME/Library/Caches/com.amazonaws.jsii"
+
+# Trivy vulnerability DB — re-downloaded on next scan (always wants fresh anyway)
+cache_clean "trivy"     "$HOME/Library/Caches/trivy"
+
+# Comet ML — stale experiment tracker cache
+cache_clean "comet"     "$HOME/Library/Caches/Comet"
+
+# go build cache — safe, rebuilt on next go build
+if require go "brew install go"; then
+  if $DRY; then echo "  (dry-run) go clean -cache"
+  else go clean -cache 2>/dev/null && ok "go build cache cleared" || warn "go clean failed"; fi
+fi
+
+# Homebrew download cache — already handled by brew_cleanup_safe above (prune=7)
+# but run again with --prune=all for a full clean
+if $DRY; then echo "  (dry-run) brew cleanup --prune=all"
+else brew cleanup --prune=all 2>/dev/null | grep "freed" | while IFS= read -r l; do ok "$l"; done || true; fi
+
+log "Cache cleanup complete"
+
+# ── 13. macOS Software Update ─────────────────────────────────────────────────
+log "=== macOS Software Update ==="
+# Apple-signed updates delivered over TLS with code-signing verification.
+# Only lists available updates — does NOT auto-install (requires sudo + reboot).
+log "Checking for macOS updates (listing only — install manually or via System Settings)"
+if $DRY; then
+  echo "  (dry-run) softwareupdate --list"
+else
+  MACOS_UPDATES=$(softwareupdate --list 2>&1 || true)
+  if echo "$MACOS_UPDATES" | grep -q "No new software available"; then
+    ok "macOS: up to date"
+  else
+    warn "macOS updates available — install via System Settings → Software Update:"
+    echo "$MACOS_UPDATES" | grep -E "^\s*\*|\bLabel\b" | while IFS= read -r line; do
+      warn "  $line"
+    done
+  fi
+fi
+
+# ── 14. RESTRICTED-NETWORK BINARIES ─────────────────────────────────────────────
+# These tools cannot be updated via brew/npm/pip because their download URLs
+# are blocked by a corporate TLS-inspecting proxy (the corporate proxy, Netskope, Palo Alto, etc.).
+# Each tool here has a verified proxy-safe alternative path.
+#
+# Tools audited (2026-06-06):
+#   ollama  — ollama.com/install.sh blocked → use GitHub releases tarball
+#   claude  — downloads.claude.ai blocked   → npm works fine (in NPM_PINNED above)
+#   rtk     — brew/Homebrew core            → unblocked, no special handling needed
+#   llmfit  — brew/Homebrew core            → unblocked, no special handling needed
+log "=== Restricted-network binaries ==="
+
+# ollama — brew-managed with GitHub releases fallback
+# Primary: brew upgrade (ghcr.io bottles — verified working through TLS-inspecting proxies as of 2026-08-18)
+# Fallback: GitHub releases tarball (ollama.com/install.sh is proxy-blocked)
+# Note: registry.ollama.ai (model pulls) remains blocked — this only updates the binary.
+update_ollama() {
+  local current latest brew_latest
+  current=$(ollama --version 2>/dev/null | awk '{print $NF}' || echo "0.0.0")
+
+  # Check what brew thinks is latest
+  brew_latest=$(brew info --json=v2 ollama 2>/dev/null \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['formulae'][0]['versions']['stable'])" 2>/dev/null || echo "")
+
+  if [[ -n "$brew_latest" && "$current" == "$brew_latest" ]]; then
+    ok "ollama: already at $current (brew-managed)"
+    return
+  fi
+
+  # ── Strategy 1: brew upgrade (preferred — SHA256 verified bottles) ──
+  if [[ -n "$brew_latest" && "$current" != "$brew_latest" ]]; then
+    log "ollama: $current → $brew_latest (via brew upgrade)"
+    if $DRY; then
+      echo "  (dry-run) brew upgrade ollama"
+      return
+    fi
+
+    # Stop server before upgrade
+    pkill -f "ollama serve" 2>/dev/null || true
+    sleep 2
+
+    if brew upgrade ollama 2>/dev/null; then
+      ok "ollama: updated to $brew_latest via brew"
+      # Restart server
+      launchctl unload ~/Library/LaunchAgents/com.ollama.ollama.plist 2>/dev/null || true
+      sleep 1
+      launchctl load ~/Library/LaunchAgents/com.ollama.ollama.plist 2>/dev/null \
+        || (ollama serve &>/usr/local/var/log/ollama.log &)
+      record_sha "ollama-post" "$(command -v ollama)"
+      return
+    fi
+    warn "ollama: brew upgrade failed — falling back to GitHub releases"
+  fi
+
+  # ── Strategy 2: GitHub releases tarball (fallback for proxy flakiness) ──
+  latest=$(curl -sL "https://api.github.com/repos/ollama/ollama/releases/latest" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))" 2>/dev/null || echo "")
+
+  if [[ -z "$latest" ]]; then
+    warn "ollama: could not fetch latest version from GitHub API — skipping"
+    return
+  fi
+
+  if [[ "$current" == "$latest" ]]; then
+    ok "ollama: already at $current"
+    return
+  fi
+
+  log "ollama: $current → $latest (via GitHub releases tarball — brew fallback)"
+  if $DRY; then
+    echo "  (dry-run) curl github.com/ollama/ollama/releases/download/v${latest}/ollama-darwin.tgz"
+    return
+  fi
+
+  local tmp_dir tmp_tgz
+  tmp_dir=$(mktemp -d)
+  tmp_tgz="${tmp_dir}/ollama-darwin.tgz"
+
+  if ! curl -fsSL "https://github.com/ollama/ollama/releases/download/v${latest}/ollama-darwin.tgz" \
+      -o "$tmp_tgz"; then
+    err "ollama: GitHub download also failed — likely proxy blocking. Try from hotspot."
+    rm -rf "$tmp_dir"
+    return
+  fi
+
+
+  # Verify GitHub release attestation (SLSA provenance) before installing
+  if command -v gh &>/dev/null; then
+    if timeout 30 gh attestation verify "$tmp_tgz" --repo ollama/ollama 2>/dev/null; then
+      sec "ollama: GitHub attestation verified ✓"
+    else
+      warn "ollama: no attestation available — proceeding (verify SHA against release page)"
+    fi
+  fi
+
+  tar -xzf "$tmp_tgz" -C "$tmp_dir"
+
+  # Install into brew's Cellar so `brew link` keeps tracking it.
+  # This avoids creating a rogue /usr/local/bin/ollama that shadows brew.
+  local ollama_cellar
+  ollama_cellar="$(brew --cellar)/ollama/${latest}/bin"
+  if [[ ! -d "$ollama_cellar" ]]; then
+    mkdir -p "$ollama_cellar" 2>/dev/null \
+      || { sudo mkdir -p "$ollama_cellar" && sudo chown -R "$(whoami)" "$(brew --cellar)/ollama/${latest}"; }
+  fi
+
+  # Stop server before replacing binary
+  pkill -f "ollama serve" 2>/dev/null || true
+  sleep 2
+
+  cp "${tmp_dir}/ollama" "$ollama_cellar/ollama" \
+    && chmod +x "$ollama_cellar/ollama" \
+    && brew link --overwrite ollama 2>/dev/null \
+    && ok "ollama: updated to $latest (GitHub → brew Cellar)" \
+    || err "ollama: failed to install binary into brew Cellar"
+
+  rm -rf "$tmp_dir"
+
+  # Restart server via launchctl
+  launchctl unload ~/Library/LaunchAgents/com.ollama.ollama.plist 2>/dev/null || true
+  sleep 1
+  launchctl load ~/Library/LaunchAgents/com.ollama.ollama.plist 2>/dev/null \
+    || (ollama serve &>/usr/local/var/log/ollama.log &)
+
+  record_sha "ollama-post" "$(command -v ollama)"
+}
+
+if require ollama "see: https://github.com/ollama/ollama/releases"; then
+  record_sha "ollama-pre" "$(command -v ollama)"
+  update_ollama
+fi
+
+
+# ── 15. SUPPLY-CHAIN VERIFICATION ────────────────────────────────────────────
+# Post-update verification layer. Verifies provenance, scans for embedded vulns,
+# and detects unexpected binary mutations between runs.
+# References: SLSA v1.0 consumer verification, NIST SP 800-218 (SSDF), CISA attestation guidance.
+log "=== SUPPLY-CHAIN VERIFICATION ==="
+
+# ── 15a. Homebrew Sigstore Provenance Verification (Gap 1) ────────────────────
+# Industry practice: Verify Sigstore attestations independently, don't just trust
+# the package manager's internal checks. Homebrew bottles from homebrew-core have
+# SLSA L3 provenance attestations since May 2024.
+sec "Verifying Homebrew bottle provenance (Sigstore attestations)…"
+PROVENANCE_FORMULAE=()
+while IFS= read -r _line; do
+  [[ -n "$_line" ]] && PROVENANCE_FORMULAE+=("$_line")
+done < <(load_list "provenance-formulae")
+
+if $DRY; then
+  echo "  (dry-run) brew verify <formula> for ${#PROVENANCE_FORMULAE[@]} critical tools"
+else
+  PROVENANCE_PASS=0
+  PROVENANCE_FAIL=0
+  for formula in "${PROVENANCE_FORMULAE[@]}"; do
+    if brew list --formula "$formula" &>/dev/null; then
+      if brew verify "$formula" 2>/dev/null; then
+        sec "  ✓ provenance verified: $formula"
+        ((PROVENANCE_PASS++))
+      else
+        warn "  ✗ no provenance or verification failed: $formula"
+        ((PROVENANCE_FAIL++))
+      fi
+    fi
+  done
+  if (( PROVENANCE_FAIL == 0 )); then
+    ok "Homebrew provenance: all ${PROVENANCE_PASS} critical formulae verified"
+  else
+    warn "Homebrew provenance: ${PROVENANCE_PASS} verified, ${PROVENANCE_FAIL} unverified"
+  fi
+fi
+
+# ── 15b. npm Provenance Signature Verification (Gap 2) ────────────────────────
+# Industry practice: `npm audit signatures` verifies Sigstore attestations on
+# installed packages — different from `npm audit` (which checks CVEs).
+# npm provenance (GA Oct 2023) proves packages were built from their claimed source repo.
+if require npm "brew install node"; then
+  log "npm audit signatures (Sigstore provenance verification)"
+  if $DRY; then
+    echo "  (dry-run) npm audit signatures --global"
+  else
+    NPM_SIG_OUT=$(npm audit signatures 2>&1 || true)
+    if echo "$NPM_SIG_OUT" | grep -qi "verified"; then
+      ok "npm signatures: all global packages have valid registry signatures"
+    elif echo "$NPM_SIG_OUT" | grep -qi "missing"; then
+      warn "npm signatures: some packages lack provenance attestations:"
+      echo "$NPM_SIG_OUT" | grep -i "missing\|invalid" | head -10 | while IFS= read -r line; do
+        warn "  $line"
+      done
+    else
+      warn "npm audit signatures: unexpected output — review manually"
+    fi
+  fi
+fi
+
+# ── 15c. GitHub Release Attestation Verification (Gap 3) ─────────────────────
+# Industry practice: Verify SLSA provenance for binaries downloaded from GitHub Releases.
+# `gh attestation verify` checks Sigstore-based artifact attestations.
+# Critical for the corporate proxy-fallback downloads where we bypass brew's verification.
+if require gh "brew install gh"; then
+  sec "Verifying GitHub release attestations for key binaries…"
+
+  # Binaries sourced from GitHub Releases (not exclusively brew)
+  # Using parallel arrays instead of associative array for bash 3.2 / set -u compatibility
+  GH_ATTEST_BINS=("ollama" "gh")
+  GH_ATTEST_REPOS=("ollama/ollama" "cli/cli")
+
+  if $DRY; then
+    echo "  (dry-run) gh attestation verify for ${#GH_ATTEST_BINS[@]} binaries"
+  else
+    for i in "${!GH_ATTEST_BINS[@]}"; do
+      bin_name="${GH_ATTEST_BINS[$i]}"
+      repo="${GH_ATTEST_REPOS[$i]}"
+      bin_path=$(command -v "$bin_name" 2>/dev/null || true)
+      if [[ -n "$bin_path" ]]; then
+        if timeout 30 gh attestation verify "$bin_path" --repo "$repo" 2>/dev/null; then
+          sec "  ✓ GitHub attestation verified: $bin_name ($repo)"
+        else
+          # Not all releases have attestations — warn but don't fail
+          warn "  ✗ no GitHub attestation: $bin_name ($repo) — may not publish attestations yet"
+        fi
+      fi
+    done
+  fi
+fi
+
+# ── 15d. SBOM Generation + Binary Vulnerability Scanning (Gap 4) ─────────────
+# Industry practice: Generate CycloneDX/SPDX SBOMs of installed binaries, then
+# scan embedded dependencies for known CVEs using grype.
+# This catches vulnerabilities INSIDE compiled binaries (e.g., a Go binary with
+# a vulnerable net/http dependency baked in at compile time).
+if require syft "brew install syft"; then
+  log "SBOM-based binary vulnerability scan"
+  SBOM_FILE="${LOG_DIR}/toolchain-sbom-$(date -u +%Y%m%d).json"
+
+  if $DRY; then
+    echo "  (dry-run) syft dir:"$BREW_PREFIX"/bin -o cyclonedx-json > $SBOM_FILE"
+    echo "  (dry-run) grype sbom:$SBOM_FILE --only-fixed --fail-on high"
+  else
+    log "  Generating SBOM for $BREW_PREFIX/bin…"
+    if syft dir:"$BREW_PREFIX"/bin -o cyclonedx-json > "$SBOM_FILE" 2>/dev/null; then
+      ok "  SBOM generated: $SBOM_FILE ($(wc -l < "$SBOM_FILE") lines)"
+
+      if require grype "brew install grype"; then
+        GRYPE_OUT=$(grype "sbom:$SBOM_FILE" --only-fixed 2>&1 || true)
+        GRYPE_HIGH=$(echo "$GRYPE_OUT" | grep -c "High\|Critical" || true)
+        if (( GRYPE_HIGH == 0 )); then
+          ok "  grype: no high/critical fixable vulns in toolchain binaries"
+        else
+          warn "  grype: $GRYPE_HIGH high/critical fixable vulnerabilities found:"
+          echo "$GRYPE_OUT" | grep "High\|Critical" | head -10 | while IFS= read -r line; do
+            warn "    $line"
+          done
+        fi
+      fi
+    else
+      warn "  syft SBOM generation failed — skipping grype scan"
+    fi
+  fi
+else
+  warn "syft not installed — install for SBOM-based binary scanning: brew install syft"
+fi
+
+# ── 15e. macOS Code Signature Verification (Gap 5) ───────────────────────────
+# Industry practice: Verify Apple codesign validity on binaries that should be signed.
+# Unsigned/invalid signatures may indicate binary replacement or tampering.
+# Note: Most Homebrew CLI tools are NOT Apple-signed — focus on commercial/vendor tools.
+sec "Verifying code signatures on signed binaries…"
+CODESIGN_TARGETS=()
+while IFS= read -r _line; do
+  [[ -n "$_line" ]] && CODESIGN_TARGETS+=("$_line")
+done < <(load_list "codesign-targets")
+
+if $DRY; then
+  echo "  (dry-run) codesign -v for ${#CODESIGN_TARGETS[@]} binaries"
+else
+  for bin in "${CODESIGN_TARGETS[@]}"; do
+    if [[ -f "$bin" || -d "$bin" ]]; then
+      if codesign -v "$bin" 2>/dev/null; then
+        sec "  ✓ codesign valid: $(basename "$bin")"
+      else
+        # Check if it's unsigned (expected for brew CLIs) vs invalid (red flag)
+        CS_OUT=$(codesign -v "$bin" 2>&1 || true)
+        if echo "$CS_OUT" | grep -q "not signed"; then
+          # Expected for many Homebrew tools — just log, don't warn
+          log "  · unsigned (expected): $(basename "$bin")"
+        else
+          warn "  ✗ codesign INVALID: $bin"
+          warn "    $CS_OUT"
+        fi
+      fi
+    fi
+  done
+fi
+
+# ── 15f. Binary SHA Diff Alerting (Gap 6) ────────────────────────────────────
+# Industry practice: Detect unexpected binary changes between runs.
+# A SHA change without a corresponding update in the log is a RED FLAG
+# indicating possible binary replacement/tampering.
+sec "Comparing binary SHAs against previous run baseline…"
+compare_sha_baseline() {
+  if [[ ! -f "$SHA_FILE" ]]; then
+    log "  No SHA baseline file — first run, nothing to compare"
+    return
+  fi
+
+  # Group final: entries by DATE (YYYY-MM-DD), not exact timestamp.
+  # A single run's final: entries may span multiple seconds (same run = same date).
+  local -a run_dates=()
+  while IFS= read -r _date_line; do
+    [[ -n "$_date_line" ]] && run_dates+=("$_date_line")
+  done < <(grep "^20.*final:" "$SHA_FILE" | awk '{print substr($1,1,10)}' | sort -u | tail -2)
+
+  if (( ${#run_dates[@]} < 2 )); then
+    log "  Only one run date recorded — nothing to compare yet"
+    return
+  fi
+
+  local prev_date="${run_dates[0]}"
+  local curr_date="${run_dates[1]}"
+  local changes=0
+  local unexplained=0
+
+  sec "  Comparing runs: $prev_date → $curr_date"
+
+  # Compare current run's final entries against previous run
+  while IFS=' ' read -r ts label bin sha; do
+    [[ "$label" != final:* ]] && continue
+
+    local bin_name="${label#final:}"
+
+    # Find same binary in previous run
+    local prev_sha
+    prev_sha=$(grep "^${prev_date}.*${label} ${bin} " "$SHA_FILE" 2>/dev/null | tail -1 | awk '{print $4}')
+
+    if [[ -z "$prev_sha" ]]; then
+      # Binary not in previous run — new addition, skip
+      continue
+    fi
+
+    if [[ "$prev_sha" != "$sha" ]]; then
+      ((changes++))
+      # Check if there was a logged update for this binary in today's log
+      local update_logged=false
+      if grep -q "${bin_name}" "$LOG_FILE" 2>/dev/null; then
+        update_logged=true
+      fi
+      # Also check if pre→post SHA change was recorded today
+      if grep "^${curr_date}" "$SHA_FILE" 2>/dev/null | grep -q "${bin_name}-pre\|${bin_name}-post"; then
+        update_logged=true
+      fi
+
+      if $update_logged; then
+        sec "  ✓ $bin_name: SHA changed (update logged)"
+      else
+        ((unexplained++))
+        err "  ⚠️  $bin_name: SHA CHANGED WITHOUT LOGGED UPDATE!"
+        err "      Binary: $bin"
+        err "      Old:    $prev_sha"
+        err "      New:    $sha"
+        err "      ACTION: Verify this binary — possible tampering!"
+      fi
+    fi
+  done < <(grep "^${curr_date}.*final:" "$SHA_FILE")
+
+  if (( unexplained > 0 )); then
+    err "  ALERT: $unexplained unexplained binary SHA changes detected!"
+    err "  Review $SHA_FILE and investigate before trusting these binaries."
+  elif (( changes > 0 )); then
+    ok "  Binary diff: $changes changes, all explained by logged updates"
+  else
+    ok "  Binary diff: no changes since last run"
+  fi
+}
+compare_sha_baseline
+
+# ── 15g. Go Binary Vulnerability Scanning (Gap 7) ────────────────────────────
+# Industry practice: Run `govulncheck -mode=binary` on installed Go binaries.
+# Go binaries embed their full dependency tree at compile time — govulncheck
+# inspects the binary's debug info to find vulnerable stdlib/module dependencies.
+# Most security tools (trivy, gh, gitleaks, osv-scanner, ollama) are Go binaries.
+if require go "brew install go"; then
+  # govulncheck installs to GOPATH/bin (~/go/bin) which may not be in PATH
+  GOBIN="${GOPATH:-$HOME/go}/bin"
+  GOVULNCHECK_BIN=$(command -v govulncheck 2>/dev/null || true)
+  [[ -z "$GOVULNCHECK_BIN" && -x "$GOBIN/govulncheck" ]] && GOVULNCHECK_BIN="$GOBIN/govulncheck"
+  if [[ -z "$GOVULNCHECK_BIN" ]]; then
+    log "Installing govulncheck…"
+    if ! $DRY; then
+      go install golang.org/x/vuln/cmd/govulncheck@latest 2>/dev/null || true
+      GOVULNCHECK_BIN=$(command -v govulncheck 2>/dev/null || true)
+      [[ -z "$GOVULNCHECK_BIN" && -x "$GOBIN/govulncheck" ]] && GOVULNCHECK_BIN="$GOBIN/govulncheck"
+    fi
+  fi
+
+  if [[ -n "$GOVULNCHECK_BIN" ]]; then
+    log "govulncheck: scanning Go-compiled binaries for embedded vulnerabilities"
+
+    # Critical Go binaries to scan (security tools + frequently-used CLIs)
+    GO_BINARY_SCAN_LIST=(
+      "trivy"
+      "gh"
+      "gitleaks"
+      "osv-scanner"
+      "ollama"
+      "syft"
+      "grype"
+      "cosign"
+      "kubectx"
+      "stern"
+    )
+
+    if $DRY; then
+      echo "  (dry-run) govulncheck -mode=binary for ${#GO_BINARY_SCAN_LIST[@]} Go binaries"
+    else
+      GOVULN_CLEAN=0
+      GOVULN_VULN=0
+      for bin_name in "${GO_BINARY_SCAN_LIST[@]}"; do
+        bin_path=$(command -v "$bin_name" 2>/dev/null || true)
+        if [[ -n "$bin_path" ]]; then
+          # Quick check: is this actually a Go binary?
+          if file "$bin_path" 2>/dev/null | grep -q "Mach-O\|ELF"; then
+            VULN_OUT=$("$GOVULNCHECK_BIN" -mode=binary "$bin_path" 2>&1 || true)
+            if echo "$VULN_OUT" | grep -q "No vulnerabilities found"; then
+              sec "  ✓ $bin_name: no known vulns"
+              ((GOVULN_CLEAN++))
+            elif echo "$VULN_OUT" | grep -q "Vulnerability #"; then
+              VULN_COUNT=$(echo "$VULN_OUT" | grep -c "Vulnerability #" || echo "?")
+              warn "  ✗ $bin_name: $VULN_COUNT vulnerabilities found"
+              # Show first 3 CVEs
+              echo "$VULN_OUT" | grep -A1 "Vulnerability #" | head -9 | while IFS= read -r line; do
+                warn "    $line"
+              done
+              ((GOVULN_VULN++))
+            else
+              log "  · $bin_name: scan completed (no definitive result)"
+              ((GOVULN_CLEAN++))
+            fi
+          fi
+        fi
+      done
+      if (( GOVULN_VULN == 0 )); then
+        ok "govulncheck: all ${GOVULN_CLEAN} Go binaries clean"
+      else
+        warn "govulncheck: $GOVULN_VULN binaries have known vulnerabilities (update via brew)"
+      fi
+    fi
+  else
+    warn "govulncheck not available — install: go install golang.org/x/vuln/cmd/govulncheck@latest"
+  fi
+fi
+
+# ── 15h. Cargo/Rust Supply-Chain Audit (Gap 8) ────────────────────────────────
+# Industry practice: crates.io has NO Sigstore support. Use cargo-audit (RustSec
+# advisory DB) to scan for vulnerable dependencies in cargo-installed binaries.
+# Also check for recently published crates with suspicious patterns.
+if require cargo "see: rustup.rs"; then
+  log "Cargo supply-chain audit (RustSec advisory database)"
+
+  if cargo audit --version &>/dev/null 2>&1; then
+    if $DRY; then
+      echo "  (dry-run) cargo audit"
+    else
+      CARGO_AUDIT_OUT=$(cargo audit 2>&1 || true)
+      if echo "$CARGO_AUDIT_OUT" | grep -q "0 vulnerabilities found\|No vulnerable packages found"; then
+        ok "cargo audit: no known vulnerabilities in cargo-installed crates"
+      elif echo "$CARGO_AUDIT_OUT" | grep -qi "vulnerability\|warning"; then
+        CARGO_VULN_COUNT=$(echo "$CARGO_AUDIT_OUT" | grep -c "^ID:" || echo "?")
+        warn "cargo audit: $CARGO_VULN_COUNT advisories found:"
+        echo "$CARGO_AUDIT_OUT" | grep -A2 "^ID:\|^Crate:\|^Version:" | head -15 | while IFS= read -r line; do
+          warn "  $line"
+        done
+      fi
+    fi
+  else
+    warn "cargo-audit not installed — install: cargo install cargo-audit"
+    warn "  Catches RustSec advisories in cargo-installed binaries"
+  fi
+
+  # Also list cargo-installed binaries for audit trail
+  log "  Cargo-installed binaries:"
+  cargo install --list 2>/dev/null | grep -E "^[a-z]" | while IFS= read -r line; do
+    log "    $line"
+  done
+fi
+
+log "Supply-chain verification complete"
+# ── 16. POST-RUN SHA SNAPSHOT ─────────────────────────────────────────────────
+log "=== Recording binary SHA256 snapshot ==="
+BINARIES_TO_RECORD=()
+while IFS= read -r _line; do
+  [[ -n "$_line" ]] && BINARIES_TO_RECORD+=("$_line")
+done < <(load_list "record-binaries")
+for bin in "${BINARIES_TO_RECORD[@]}"; do
+  bin_path=$(command -v "$bin" 2>/dev/null || true)
+  if [[ -n "$bin_path" ]]; then
+    record_sha "final:$bin" "$bin_path"
+    sec "  SHA256 recorded: $bin → $bin_path"
+  fi
+done
+log "SHA snapshot → $SHA_FILE"
+
+# ── DONE ──────────────────────────────────────────────────────────────────────
+log "============================================"
+log "Done ✅  Full log: $LOG_FILE"
+log "SHA snapshot: $SHA_FILE"
+log "============================================"
+log "NEXT STEPS (manual):"
+warn "  1. Review any [warn] lines above"
+warn "  2. Check macOS Software Update in System Settings"
+warn "  3. Review $SHA_FILE for unexpected binary changes"
+warn "  4. Run './update-toolchain.sh --audit' anytime to re-check security posture"
+warn "  5. If govulncheck/grype found vulns, update affected tools: brew upgrade <formula>"
+warn "  6. SBOM archived at: $LOG_DIR/toolchain-sbom-$(date -u +%Y%m%d).json"

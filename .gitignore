@@ -1,0 +1,11 @@
+# Local config — the whole point is that these are per-machine.
+# Only the *.example files belong in git.
+config/*
+!config/*.example
+
+# Runtime artefacts
+*.log
+binary-shas.txt
+toolchain-sbom-*.json
+
+.DS_Store
