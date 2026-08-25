@@ -1,5 +1,19 @@
 # Changelog
 
+
+## Unreleased
+
+### Added
+- `--init` flag: one-time config seeding for new machines. Copies bundled
+  example configs to `~/.config/update-toolchain/`, drops the `.example` suffix,
+  and appends any currently-tapped third-party taps that are not already in the
+  allowlist. Solves the first-run UX problem where installing via
+  `brew install prasannavarshan/tap/update-toolchain` inherently adds a tap that
+  the bundled example does not list, causing an immediate UNTRUSTED TAP error.
+- Hint in the UNTRUSTED TAP error output: when no user config directory exists,
+  the error now suggests `update-toolchain --init` instead of only showing the
+  manual `echo ... >>` fix.
+
 ## v0.4.0
 
 Still `0.x` deliberately. The interface gained three flags in a day and seven

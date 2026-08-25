@@ -20,12 +20,14 @@ GOBIN="${GOPATH:-$HOME/go}/bin"
 DRY=false
 AUDIT_ONLY=false
 JSON=false
+INIT=false
 COLOR_MODE=auto
 FAIL_ON=never
 for arg in "$@"; do
   case "$arg" in
     --dry)   DRY=true ;;
     --audit) AUDIT_ONLY=true ;;
+    --init)  INIT=true ;;
     --json)  JSON=true ;;
     --color=always) COLOR_MODE=always ;;
     --color=never)  COLOR_MODE=never ;;
@@ -34,9 +36,12 @@ for arg in "$@"; do
     --fail-on=warn)  FAIL_ON=warn ;;
     --fail-on=error) FAIL_ON=error ;;
     --help)
-      echo "Usage: $0 [--dry] [--audit] [--json] [--color=auto|always|never]"
+      echo "Usage: $0 [--dry] [--audit] [--init] [--json] [--color=auto|always|never]"
       echo "  --dry     Print commands without executing"
       echo "  --audit   Run security checks only, no updates"
+      echo "  --init    Copy bundled example configs to ~/.config/update-toolchain/"
+      echo "            and seed allowed-taps with your currently installed taps."
+      echo "            Run this once after install to personalise the allowlists."
       echo "  --json    Emit a machine-readable report on stdout; progress to stderr"
       echo "  --color   Colour policy. Default auto: on only when stdout is a"
       echo "            terminal and NO_COLOR is unset."
@@ -89,6 +94,59 @@ load_list() {
     | sed -e "s|\${BREW_PREFIX}|${BREW_PREFIX}|g" \
     || true
 }
+
+
+# ── --init: one-time config seeding ───────────────────────────────────────────
+# Copies the bundled examples into the user config directory, drops the .example
+# suffix, and appends any currently-tapped third-party taps that are not already
+# in the allowlist. This makes the first run on a new machine painless without
+# auto-trusting anything the user has not already chosen to install.
+if $INIT; then
+  if [[ -d "$CONFIG_DIR" ]] && [[ -f "$CONFIG_DIR/allowed-taps" ]]; then
+    echo "Config directory already exists: $CONFIG_DIR"
+    echo "Remove it first if you want a fresh init, or edit files directly."
+    exit 2
+  fi
+  mkdir -p "$CONFIG_DIR"
+  copied=0
+  for f in "$EXAMPLE_DIR"/*.example; do
+    [[ -f "$f" ]] || continue
+    dest="$CONFIG_DIR/$(basename "${f%.example}")"
+    if [[ -f "$dest" ]]; then
+      echo "  skip (exists): $dest"
+    else
+      cp "$f" "$dest"
+      echo "  created: $dest"
+      copied=$((copied + 1))
+    fi
+  done
+  # Seed allowed-taps with taps already on this machine that are not in the
+  # bundled example. The user chose to tap these — they should not need to
+  # discover the config file path from an error message on first run.
+  taps_file="$CONFIG_DIR/allowed-taps"
+  if [[ -f "$taps_file" ]]; then
+    added=0
+    while IFS= read -r tap; do
+      [[ -z "$tap" ]] && continue
+      # Skip official Homebrew taps — trusted by remote URL, not by name.
+      case "$tap" in homebrew/*) continue ;; esac
+      # Already present?
+      if grep -qxF "$tap" "$taps_file" 2>/dev/null; then continue; fi
+      printf '\n# Added by --init (already tapped on this machine, %s)\n%s\n' "$(date +%Y-%m-%d)" "$tap" >> "$taps_file"
+      echo "  allowed-taps += $tap"
+      added=$((added + 1))
+    done < <(brew tap 2>/dev/null)
+    if [[ "$added" -gt 0 ]]; then
+      echo ""
+      echo "Added $added tap(s) to allowed-taps. Review them:"
+      echo "  $taps_file"
+    fi
+  fi
+  echo ""
+  echo "Done. $copied config file(s) created in $CONFIG_DIR"
+  echo "Edit them for your machine, then run: update-toolchain --dry"
+  exit 0
+fi
 
 # ── Colour and output routing ─────────────────────────────────────────────────
 # Colour is on only when a human is plausibly reading: stdout is a terminal and
@@ -396,6 +454,10 @@ while IFS= read -r tap; do
 done < <(brew tap 2>/dev/null)
 
 if $SECURITY_FAIL; then
+  # Nudge first-time users toward --init rather than manual config editing.
+  if [[ ! -d "$CONFIG_DIR" ]]; then
+    detail "→ First time? Run: update-toolchain --init"
+  fi
   # Read-only modes must finish and report everything they found. Aborting on
   # the first problem hides the rest of the audit, which is the whole point.
   if $DRY || $AUDIT_ONLY; then

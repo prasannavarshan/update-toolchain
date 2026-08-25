@@ -32,6 +32,18 @@ that should stay your decision.
 brew tap prasannavarshan/tap && brew trust prasannavarshan/tap && brew install update-toolchain
 ```
 
+
+After install, seed the config for your machine:
+
+```bash
+update-toolchain --init
+```
+
+This copies the bundled allowlist examples into `~/.config/update-toolchain/`
+and appends any third-party taps already on your machine. Without this step the
+first run will flag your taps (including this one) as untrusted — the tool
+treats every trust decision as opt-in.
+
 The `brew trust` step is required, not optional: current Homebrew refuses to
 load a formula from an untrusted third-party tap, and only official Homebrew
 repositories are trusted by default. A tap cannot waive that from its own
@@ -59,6 +71,7 @@ update-toolchain --dry     # report what would change; touches nothing
 update-toolchain --audit   # security checks only, no updates
 update-toolchain           # apply updates
 update-toolchain --json    # machine-readable report on stdout
+update-toolchain --init    # one-time: seed config for this machine
 ```
 
 ### Exit codes
