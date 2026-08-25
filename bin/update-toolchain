@@ -196,7 +196,7 @@ detail(){ printf "%s        %s%s\n" "$C_DIM" "$*" "$C_RESET" >&3; echo "[$(_ts)]
 # Phase markers give a sense of position without animation. They go to fd 3 and
 # carry no carriage returns, so a redirected run reads back as a clean list.
 PHASE_N=0
-PHASE_TOTAL=16
+PHASE_TOTAL=17
 phase() {
   PHASE_N=$((PHASE_N + 1))
   printf "\n%s[%d/%d]%s %s%s%s\n" \
@@ -508,6 +508,96 @@ for dir in "${PATH_DIRS[@]}"; do
   fi
 done
 sec "PATH check complete"
+
+# ── 1g. BOOT INTEGRITY & ROOTKIT DETECTION (Apple Silicon) ────────────────────
+# Detects firmware-level persistence, unauthorized LaunchDaemons, and kernel
+# extension injection — the primary macOS rootkit vectors.
+# Ref: BlackLotus (UEFI), Hive (macOS implant), CloudMensis (persistence)
+phase "BOOT INTEGRITY & ROOTKIT DETECTION"
+
+# 1g-i. Verify no third-party kernel extensions loaded
+# Modern macOS (Big Sur+) blocks kexts by default; any loaded non-Apple kext
+# is suspicious and warrants investigation.
+sec "Checking for non-Apple kernel extensions…"
+KEXT_OUTPUT=$(kmutil showloaded 2>/dev/null || true)
+NON_APPLE_KEXTS=$(echo "$KEXT_OUTPUT" | { grep -v "com.apple\|Index\|No variant\|^$\|Executing" || true; } | wc -l | tr -d ' ')
+if [[ "$NON_APPLE_KEXTS" -gt 0 ]]; then
+  err "$NON_APPLE_KEXTS non-Apple kernel extension(s) loaded — possible rootkit persistence!"
+  detail "$(echo "$KEXT_OUTPUT" | { grep -v "com.apple\|Index\|No variant\|^$\|Executing" || true; })"
+  SECURITY_FAIL=true
+else
+  sec "Kernel extensions: clean (no non-Apple kexts loaded) ✓"
+fi
+
+# 1g-ii. Signed System Volume (SSV) integrity
+# Apple Silicon boots from a cryptographically sealed system volume.
+# If SSV snapshots are missing, the boot chain may be compromised.
+sec "Checking Signed System Volume (SSV) snapshots…"
+SSV_DISK=$(mount | grep " / " | awk '{print $1}' | sed 's|/dev/||; s|s[0-9]*$||' || echo "disk3s3")
+SSV_SNAPSHOTS=$(diskutil apfs listSnapshots "$SSV_DISK" 2>/dev/null | { grep -c "com.apple.os.update" || true; })
+if [[ "$SSV_SNAPSHOTS" -gt 0 ]]; then
+  sec "SSV snapshots present ($SSV_SNAPSHOTS found) — boot volume integrity OK ✓"
+else
+  warn "No SSV update snapshots found on $SSV_DISK — boot volume integrity uncertain"
+fi
+
+# 1g-iii. LaunchDaemon baseline diff
+# Rootkits persist via LaunchDaemons. Compare current state against a known-good baseline.
+# First run creates the baseline; subsequent runs detect new additions.
+LAUNCHDAEMON_BASELINE="${LOG_DIR}/launchdaemons-baseline.txt"
+CURRENT_DAEMONS=$(ls /Library/LaunchDaemons/*.plist 2>/dev/null | sort)
+
+if [[ -f "$LAUNCHDAEMON_BASELINE" ]]; then
+  sec "Comparing LaunchDaemons against baseline…"
+  NEW_DAEMONS=$(comm -13 "$LAUNCHDAEMON_BASELINE" <(echo "$CURRENT_DAEMONS") || true)
+  REMOVED_DAEMONS=$(comm -23 "$LAUNCHDAEMON_BASELINE" <(echo "$CURRENT_DAEMONS") || true)
+
+  if [[ -n "$NEW_DAEMONS" ]]; then
+    warn "NEW LaunchDaemons detected since last baseline — investigate:"
+    echo "$NEW_DAEMONS" | while IFS= read -r d; do
+      bin_path=$(defaults read "$d" ProgramArguments 2>/dev/null | grep -oE '/[^ ",]+' | head -1 || true)
+      if [[ -n "$bin_path" && -x "$bin_path" ]]; then
+        sign_status=$(codesign -v "$bin_path" 2>&1 && echo "SIGNED" || echo "UNSIGNED")
+        detail "  NEW: $d → binary: $bin_path [$sign_status]"
+      else
+        detail "  NEW: $d (binary not found or not executable)"
+      fi
+    done
+  else
+    sec "LaunchDaemons: no new additions since baseline ✓"
+  fi
+
+  if [[ -n "$REMOVED_DAEMONS" ]]; then
+    warn "LaunchDaemons removed since baseline (may be expected):"
+    echo "$REMOVED_DAEMONS" | while IFS= read -r d; do detail "  REMOVED: $d"; done
+  fi
+else
+  sec "Creating LaunchDaemon baseline (first run)…"
+  echo "$CURRENT_DAEMONS" > "$LAUNCHDAEMON_BASELINE"
+  ok "Baseline created: $LAUNCHDAEMON_BASELINE ($(echo "$CURRENT_DAEMONS" | wc -l | tr -d ' ') entries)"
+fi
+
+# 1g-iv. Check for pending firmware updates (bundled in macOS updates on Apple Silicon)
+sec "Checking for pending firmware updates…"
+PENDING_FW=$(softwareupdate --list 2>&1 || true)
+if echo "$PENDING_FW" | grep -q "Recommended: YES"; then
+  FW_LABEL=$(echo "$PENDING_FW" | grep "Label:" | sed 's/.*Label: //' | head -1)
+  warn "macOS/firmware update available: $FW_LABEL"
+  detail "  Apple Silicon firmware patches are bundled in macOS updates."
+  detail "  Apply via System Settings → Software Update (requires restart)"
+else
+  sec "macOS/firmware: up to date ✓"
+fi
+
+# 1g-v. FileVault disk encryption status
+FV_STATUS=$(fdesetup status 2>/dev/null || echo "unknown")
+if echo "$FV_STATUS" | grep -q "On"; then
+  sec "FileVault: enabled ✓"
+else
+  warn "FileVault is OFF — disk contents are readable if device is physically compromised"
+fi
+
+sec "Boot integrity checks complete"
 
 if $AUDIT_ONLY; then
   log "Audit-only mode — exiting without updates"

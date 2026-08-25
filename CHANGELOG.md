@@ -13,6 +13,10 @@
 - Hint in the UNTRUSTED TAP error output: when no user config directory exists,
   the error now suggests `update-toolchain --init` instead of only showing the
   manual `echo ... >>` fix.
+- Boot integrity and rootkit detection phase (ported from private dotfiles):
+  kernel extension audit, Signed System Volume snapshot check, LaunchDaemon
+  baseline diffing with code-sign verification of new entries, firmware update
+  detection, and FileVault status.
 
 ## v0.4.0
 
