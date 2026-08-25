@@ -533,7 +533,8 @@ fi
 # Apple Silicon boots from a cryptographically sealed system volume.
 # If SSV snapshots are missing, the boot chain may be compromised.
 sec "Checking Signed System Volume (SSV) snapshots…"
-SSV_DISK=$(mount | grep " / " | awk '{print $1}' | sed 's|/dev/||; s|s[0-9]*$||' || echo "disk3s3")
+SSV_DISK=$(diskutil info / 2>/dev/null | awk '/Device Identifier/{print $NF}')
+[[ -z "$SSV_DISK" ]] && SSV_DISK="unknown"
 SSV_SNAPSHOTS=$(diskutil apfs listSnapshots "$SSV_DISK" 2>/dev/null | { grep -c "com.apple.os.update" || true; })
 if [[ "$SSV_SNAPSHOTS" -gt 0 ]]; then
   sec "SSV snapshots present ($SSV_SNAPSHOTS found) — boot volume integrity OK ✓"
