@@ -8,4 +8,16 @@ config/*
 binary-shas.txt
 toolchain-sbom-*.json
 
+# Local agent guardrails — maintainer context, not project documentation.
+# These name the employer-specific identifiers that must never reach a public
+# repo, so they are exactly the files that must not reach one themselves.
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.kiro/
+.cursor/
+.windsurfrules
+.aider*
+
 .DS_Store
