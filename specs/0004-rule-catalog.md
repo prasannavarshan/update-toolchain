@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Threat model layer** | Cross-cutting. Gives every finding an identity. |
 | **Breaking** | No, but it adds a field to `--json`. Consumers reading positionally would break; consumers reading by key would not. |
 
@@ -234,11 +234,15 @@ case for an unmigrated ID. Wrap it.
 
 ## Open questions
 
-- Whether `citation` should be a URL or a short label. Labels read better in a
-  terminal and do not rot; URLs are more useful in the markdown report. Possible
-  answer: label in the catalog, with a separate `config/citations` mapping
-  labels to URLs that the report resolves and the terminal ignores.
-- Whether `subject` needs structure — for `mcp.*` it is naturally
-  `server/key`, for `sha.*` it is a path. Currently a free string. Structuring it
-  would help the report group findings; leaving it free is simpler and defers a
-  decision that is cheap to revisit.
+Both resolved during implementation.
+
+- **`citation` — URL or short label?** Resolved: **short label**. The catalog
+  stores labels like `SECURITY.md Layer 3`, which read cleanly in a terminal and
+  do not rot when docs move. A `config/citations` label→URL map that the report
+  resolves and the terminal ignores is deferred to a later spec (0002), so this
+  spec does not introduce one.
+- **Does `subject` need structure?** Resolved: **free string**, for now. It is
+  passed to `finding` as the second argument and rendered verbatim. Structuring
+  it (`server/key` for `mcp.*`, a path for `sha.*`) would help the report group
+  findings, but that grouping is 0002's concern; leaving it free keeps this spec
+  small and the decision cheap to revisit when the report is built.

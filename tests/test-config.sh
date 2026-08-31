@@ -171,6 +171,94 @@ else
   bad "untrusted taps warn (not die) in read-only mode" "warn branch not found"
 fi
 
+echo "== rule catalog (spec 0004) =="
+
+CATALOG="$ROOT/config/rules.example"
+
+# AC2: every catalog row has exactly five pipe-delimited fields. A truncated
+# row (empty remediation instead of the em-dash placeholder) is a bug.
+if [[ -f "$CATALOG" ]]; then
+  bad_rows=0
+  while IFS= read -r cline; do
+    # strip comments/blanks the way load_list does
+    cline="$(printf '%s' "$cline" | sed -e 's/[[:space:]]*#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [[ -z "$cline" ]] && continue
+    nf=$(printf '%s' "$cline" | awk -F'|' '{print NF}')
+    if [[ "$nf" -ne 5 ]]; then
+      bad_rows=$((bad_rows+1))
+      printf '       offending row (%d fields): %s\n' "$nf" "$cline"
+    fi
+  done < "$CATALOG"
+  check "every catalog row has exactly 5 fields" "0" "$bad_rows"
+else
+  bad "catalog exists" "config/rules.example not found"
+fi
+
+# AC1: every rule ID referenced by a `finding` call site exists in the catalog.
+# A typo becomes a test failure, not a silently unlabelled finding. We match
+# `finding <id>` where <id> is a literal domain.rule (skip the internal
+# recursive call which uses the same literal, and any dynamic ids — there are
+# none today).
+missing_ids=""
+while IFS= read -r fid; do
+  [[ -z "$fid" ]] && continue
+  if ! grep -qE "^${fid}[[:space:]]*\|" "$CATALOG"; then
+    missing_ids="$missing_ids $fid"
+  fi
+done < <(grep -oE 'finding[[:space:]]+[a-z][a-z0-9-]*\.[a-z0-9-]+' "$SCRIPT" \
+           | awk '{print $2}' | sort -u)
+check "every finding() call-site id is in the catalog" "" "$missing_ids"
+
+# AC6 / config-is-data: the canary must extend to config/rules. Remediation
+# text contains ${VAR} and backticks as prose; loading must never evaluate it.
+rules_canary="$TMP/rules_canary"
+cat > "$TMP/ex/config/rules.example" <<EOF
+evil.rule | error | \$(touch "$rules_canary") | \`touch "$rules_canary"\` | x
+EOF
+run_load "$TMP/nonexistent" "$TMP/ex" rules >/dev/null
+if [[ -e "$rules_canary" ]]; then
+  bad "rule catalog cannot execute code" "canary created — catalog was evaluated"
+else
+  ok "rule catalog cannot execute code"
+fi
+
+# severity -> level mapping and AC9: log line is `[LEVEL] [rule.id] message`,
+# with the rule id extractable as a second bracketed field via sed. Exercise
+# the shipped finding() by sourcing the config block (for load_list) plus the
+# logging block (for finding() itself).
+fx="$TMP/finding.sh"
+{
+  sed -n '/^# ── Config ─/,/^# ── /{ /^# ── [^C]/q; p; }' "$SCRIPT"
+  sed -n '/^# ── Logging ─/,/^# ── Summary ─/p' "$SCRIPT"
+} > "$fx"
+grep -q 'finding()' "$fx"  || { echo "FATAL: could not extract finding()"; exit 1; }
+grep -q 'load_list()' "$fx" || { echo "FATAL: could not extract load_list()"; exit 1; }
+
+finding_test() { # finding_test <severity-in-catalog> -> "LEVEL|extracted-id"
+  ( set -uo pipefail
+    mkdir -p "$TMP/fxex/config"
+    printf 'demo.rule | %s | Demo | fix it | SECURITY.md Layer 1\n' "$1" > "$TMP/fxex/config/rules.example"
+    # shellcheck disable=SC1090
+    source "$fx"
+    # Override AFTER sourcing: the sourced Config and Logging blocks re-assign
+    # EXAMPLE_DIR and LOG_FILE. Setting them before source would be clobbered —
+    # in particular LOG_FILE would point at the real timestamped log, and two
+    # calls in the same second would share it (the bug this ordering fixes).
+    C_RED=""; C_YELLOW=""; C_MAGENTA=""; C_RESET=""; C_DIM=""; C_BLUE=""; C_GREEN=""; C_BOLD=""
+    CONFIG_DIR="$TMP/fxcfg"; EXAMPLE_DIR="$TMP/fxex/config"; BREW_PREFIX="/opt/testbrew"
+    LOG_FILE="$TMP/fx.log"; : > "$LOG_FILE"
+    finding demo.rule "the-subject" "extra" >/dev/null 2>&1
+    local logged lvl rid
+    logged="$(grep '\[demo\.rule\]' "$LOG_FILE" | head -1)"
+    lvl=$(printf '%s' "$logged" | sed -n 's/^[^ ]* \[\([A-Z]*\)\].*/\1/p')
+    rid=$(printf '%s' "$logged" | sed -n 's/^[^ ]* \[[A-Z]*\] \[\([a-z][a-z0-9.-]*\)\].*/\1/p')
+    printf '%s|%s' "$lvl" "$rid" )
+}
+
+check "severity error  -> ERROR, id extractable" "ERROR|demo.rule" "$(finding_test error)"
+check "severity warning -> WARN, id extractable"  "WARN|demo.rule"  "$(finding_test warning)"
+check "severity info    -> SEC, id extractable"   "SEC|demo.rule"   "$(finding_test info)"
+
 echo "== syntax =="
 if bash -n "$SCRIPT" 2>/dev/null; then ok "bin/update-toolchain parses"; else bad "bin/update-toolchain parses"; fi
 

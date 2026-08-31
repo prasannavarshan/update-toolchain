@@ -15,7 +15,7 @@ Small fixes go straight to a commit.
 | [0001](0001-terminal-output.md) | Collapse-on-pass terminal output | Draft |
 | [0002](0002-reports.md) | Markdown and HTML reports | Draft |
 | [0003](0003-agentic-hygiene.md) | Agent configuration audit phase | Draft |
-| [0004](0004-rule-catalog.md) | Rule catalog format and IDs | Draft |
+| [0004](0004-rule-catalog.md) | Rule catalog format and IDs | Implemented |
 
 Status is one of `Draft`, `Accepted`, `Implemented`, `Superseded`, `Withdrawn`.
 A spec stays in the repository after it ships — the reasoning is the point, and

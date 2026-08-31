@@ -193,6 +193,87 @@ die()   { err "$*"; _finish; exit 2; }
 # One problem reported as three errors makes the counts useless for alerting.
 detail(){ printf "%s        %s%s\n" "$C_DIM" "$*" "$C_RESET" >&3; echo "[$(_ts)] [DETAIL] $*" >> "$LOG_FILE"; }
 
+# ── Rule catalog (spec 0004) ──────────────────────────────────────────────────
+# The catalog gives every finding a stable identity, a severity separate from
+# the log level it produces, and remediation/citation text kept out of the emit
+# site. It is DATA: loaded through load_list (parsed, never sourced), so
+# remediation prose containing ${VAR}, >>, or backticks is printed, never run.
+#
+# bash 3.2 has no associative array, so lookup is a grep per finding. At tens of
+# rules and tens of findings the cost is irrelevant and the alternative is
+# unavailable. The catalog is read once into a variable to avoid re-reading the
+# file on every finding.
+RULES_CACHE=""
+RULES_LOADED=false
+RULES_MISSING_WARNED=false
+_load_rules() {
+  $RULES_LOADED && return 0
+  RULES_LOADED=true
+  # load_list emits nothing when neither config/rules nor rules.example exists.
+  RULES_CACHE="$(load_list "rules" || true)"
+  return 0
+}
+
+# _rule_row <id> → the catalog row for <id> on stdout, empty if absent.
+# The lookup matching nothing is the expected case for an unmigrated ID under
+# set -euo pipefail, so it is wrapped to never fail the run.
+_rule_row() {
+  local id="$1"
+  _load_rules
+  printf '%s\n' "$RULES_CACHE" | { grep -E "^${id}[[:space:]]*\|" || true; } | head -1
+}
+
+# _rule_field <row> <n> → the nth pipe-delimited field, trimmed.
+_rule_field() {
+  printf '%s' "$1" | cut -d'|' -f"$2" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
+# finding <rule-id> <subject> [detail...]
+# Looks the rule up in the catalog, maps its severity to a log level, prints,
+# logs a machine-parseable line, and renders remediation via detail. A rule id
+# with no catalog entry still emits — as a warn with "rule": null in JSON — so a
+# partially-migrated tool is correct, just less uniform.
+finding() {
+  local id="$1" subject="${2:-}"; shift $(( $# >= 2 ? 2 : $# ))
+  local extra="$*"
+  local row severity title remediation
+  row="$(_rule_row "$id")"
+
+  if [[ -z "$row" && "$RULES_CACHE" == "" ]] && ! $RULES_MISSING_WARNED; then
+    # No catalog at all: degrade to unlabelled findings plus one warning,
+    # rather than failing the run. Only warn once per run.
+    RULES_MISSING_WARNED=true
+    finding tool.missing-dependency "config/rules" "rule catalog not found — findings will be unlabelled"
+  fi
+
+  # The message is subject plus any extra detail, em-dash separated, matching
+  # the log format the JSON reader and _tally already parse.
+  local message="$subject"
+  [[ -n "$extra" ]] && message="$subject — $extra"
+
+  if [[ -n "$row" ]]; then
+    severity="$(_rule_field "$row" 2)"
+    title="$(_rule_field "$row" 3)"
+    remediation="$(_rule_field "$row" 4)"
+  else
+    severity="warning"; title=""; remediation=""
+  fi
+
+  # severity → log level: error->ERROR, warning->WARN, info->SEC. --fail-on is
+  # unchanged because it counts log levels, not catalog severities.
+  local level colour tag
+  case "$severity" in
+    error)   level="ERROR"; colour="$C_RED";     tag="[error]" ;;
+    info)    level="SEC";   colour="$C_MAGENTA"; tag="[sec]  " ;;
+    *)       level="WARN";  colour="$C_YELLOW";  tag="[warn] " ;;
+  esac
+
+  printf "%s%s%s %s\n" "$colour" "$tag" "$C_RESET" "${title:+$title: }$message" >&3
+  echo "[$(_ts)] [$level] [$id] $message" >> "$LOG_FILE"
+  [[ -n "$remediation" && "$remediation" != "—" ]] && detail "→ $remediation"
+  return 0
+}
+
 # Phase markers give a sense of position without animation. They go to fd 3 and
 # carry no carriage returns, so a redirected run reads back as a clean list.
 PHASE_N=0
@@ -279,12 +360,40 @@ _json_report() {
   first=1
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
-    local level text
+    local level rest rule text row severity title remediation citation
     level=$(printf '%s' "$line" | sed -n 's/^[^ ]* \[\([A-Z]*\)\].*/\1/p')
-    text=$(printf '%s' "$line" | sed -e 's/^[^ ]* \[[A-Z]*\][[:space:]]*//')
+    # Everything after the level bracket.
+    rest=$(printf '%s' "$line" | sed -e 's/^[^ ]* \[[A-Z]*\][[:space:]]*//')
+    # A converted finding (spec 0004) carries a bracketed rule ID as the next
+    # token: "[domain.rule] message". A plain warn/err has no such bracket, so
+    # rule stays null and message is the whole remainder — unchanged behaviour.
+    rule=""; text="$rest"
+    case "$rest" in
+      \[*.*\]\ *|\[*.*\])
+        rule=$(printf '%s' "$rest" | sed -n 's/^\[\([a-z][a-z0-9-]*\.[a-z0-9-]*\)\].*/\1/p')
+        if [[ -n "$rule" ]]; then
+          text=$(printf '%s' "$rest" | sed -e 's/^\[[a-z][a-z0-9.-]*\][[:space:]]*//')
+        fi
+        ;;
+    esac
+
     [[ $first -eq 0 ]] && printf ',\n'
     first=0
-    printf '    { "level": "%s", "message": "%s" }' "$level" "$(_json_escape "$text")"
+
+    if [[ -n "$rule" ]]; then
+      row="$(_rule_row "$rule")"
+      severity="$(_rule_field "$row" 2)"
+      title="$(_rule_field "$row" 3)"
+      remediation="$(_rule_field "$row" 4)"
+      citation="$(_rule_field "$row" 5)"
+      printf '    { "level": "%s", "rule": "%s", "severity": "%s", "title": "%s", "remediation": "%s", "citation": "%s", "message": "%s" }' \
+        "$level" "$(_json_escape "$rule")" "$(_json_escape "$severity")" \
+        "$(_json_escape "$title")" "$(_json_escape "$remediation")" \
+        "$(_json_escape "$citation")" "$(_json_escape "$text")"
+    else
+      printf '    { "level": "%s", "rule": null, "message": "%s" }' \
+        "$level" "$(_json_escape "$text")"
+    fi
   done < <(grep -E "\[(WARN|ERROR)\]" "$LOG_FILE" 2>/dev/null || true)
   [[ $first -eq 0 ]] && printf '\n'
   printf '  ]\n'
@@ -446,8 +555,9 @@ while IFS= read -r tap; do
   if $allowed; then
     sec "  tap OK: $tap ($reason)"
   else
-    err "UNTRUSTED TAP DETECTED: '$tap'${remote:+ → $remote}"
-    detail "→ Remove it:   brew untap '$tap'"
+    # spec 0004: remediation and citation now live in config/rules, not here.
+    # The "trust it" hint stays inline because it interpolates the live path.
+    finding brew.untrusted-tap "$tap" "${remote:-no remote}"
     detail "→ Or trust it: echo '$tap' >> ${CONFIG_DIR}/allowed-taps"
     SECURITY_FAIL=true
   fi

@@ -1,0 +1,63 @@
+# Rule catalog — the tool's own data, not user policy (spec 0004).
+#
+# Unlike every other file in config/, this is shipped and NOT meant to be
+# user-edited: a user who can rewrite severity or remediation text can make a
+# finding say the opposite of what the check found. Users influence findings
+# through additive, visible suppression (agent-rules, spec 0003), never by
+# rewriting this table.
+#
+# Format, pipe-delimited so load_list's comment/blank stripping applies as-is:
+#
+#   id | severity | title | remediation | citation
+#
+# - id         <domain>.<rule>, lowercase, hyphen-within-part, dot-between.
+# - severity   error | warning | info. Maps to log level: error->err,
+#              warning->warn, info->sec. Separate from --fail-on, which counts
+#              log levels, not severities.
+# - title      short human label, stable across message rewording.
+# - remediation what to do about it. Never empty: use the em dash placeholder
+#              when there is no sensible value, so a truncated row is detectable.
+# - citation   short label pointing at the threat model layer (SECURITY.md),
+#              not a URL — labels read in a terminal and do not rot.
+#
+# This file is DATA. It is parsed, never sourced. Remediation text may contain
+# ${VAR}, >>, or backticks as literal prose; they are printed, never evaluated.
+
+# ── brew: Homebrew origin, taps, doctor, deprecated formulae ──────────────────
+brew.untrusted-tap | error | Untrusted Homebrew tap | brew untap it, or add it to allowed-taps | SECURITY.md Layer 3
+brew.remote-tampered | error | Homebrew remote origin is not the official source | Reset the origin to the official Homebrew remote before updating | SECURITY.md Layer 3
+brew.doctor | info | brew doctor reported warnings | Review brew doctor output; most warnings are informational | —
+brew.deprecated-formula | info | Deprecated or orphaned formula installed | Migrate to the maintained replacement or uninstall it | —
+
+# ── system: SIP, Gatekeeper, PATH permissions ────────────────────────────────
+system.sip-disabled | error | System Integrity Protection is disabled | Re-enable SIP from Recovery: csrutil enable | SECURITY.md Layer 3
+system.gatekeeper-disabled | error | Gatekeeper is disabled | Re-enable Gatekeeper: sudo spctl --master-enable | SECURITY.md Layer 3
+system.path-world-writable | error | World-writable directory on PATH | Remove write for other on the directory, or drop it from PATH | SECURITY.md Layer 3
+
+# ── boot: kexts, SSV, LaunchDaemons, firmware, FileVault ──────────────────────
+boot.non-apple-kext | warning | Non-Apple kernel extension loaded | Confirm the kext is expected; unload and remove if not | SECURITY.md Layer 3
+boot.ssv-missing | warning | Signed System Volume snapshot not sealed | Verify the system volume is on a sealed snapshot; reinstall macOS if not | SECURITY.md Layer 3
+boot.new-launchdaemon | warning | New LaunchDaemon since last baseline | Confirm the daemon is expected before trusting it | SECURITY.md Layer 3
+boot.firmware-pending | info | Firmware update pending | Install the pending macOS update to apply firmware; needs a restart | —
+boot.filevault-disabled | warning | FileVault disk encryption is disabled | Enable FileVault in System Settings > Privacy & Security | SECURITY.md Layer 3
+
+# ── npm: global updates, audit, provenance signatures ─────────────────────────
+npm.audit | warning | npm audit reported vulnerabilities | Review npm audit and update the affected package to a fixed version | SECURITY.md Layer 2
+npm.provenance-unverified | warning | npm package lacks a verified provenance signature | Prefer a version published with provenance, or pin the current one deliberately | SECURITY.md Layer 2
+
+# ── sha: binary SHA recording and drift ───────────────────────────────────────
+sha.unexplained-change | warning | Binary SHA changed without a corresponding update | Investigate why the binary changed; a silent change is the alarm | SECURITY.md Layer 4
+
+# ── provenance: Sigstore, GitHub attestations, code signatures ────────────────
+provenance.unverified | warning | Provenance attestation could not be verified | Confirm the artifact source; a failed attestation is a supply-chain signal | SECURITY.md Layer 2
+provenance.codesign-invalid | error | Code signature verification failed | Do not trust the binary; reinstall from the official source | SECURITY.md Layer 2
+
+# ── vuln: grype, govulncheck, cargo audit, pip-audit ──────────────────────────
+vuln.grype | warning | grype reported vulnerabilities in the SBOM | Review the grype report and update affected components | SECURITY.md Layer 4
+vuln.govulncheck | warning | govulncheck reported Go vulnerabilities | Update the affected Go module to a patched version | SECURITY.md Layer 4
+vuln.cargo-audit | warning | cargo audit reported Rust vulnerabilities | Update the affected crate to a patched version | SECURITY.md Layer 4
+vuln.pip-audit | warning | pip-audit reported Python vulnerabilities | Update the affected package to a patched version | SECURITY.md Layer 4
+
+# ── tool: the tool's own failures ─────────────────────────────────────────────
+tool.missing-dependency | warning | An optional dependency for a check is missing | Install the named tool to enable this check, or ignore if intentional | —
+tool.unparseable-config | warning | A config file could not be parsed | Fix the malformed line; the check ran without its configured input | —
